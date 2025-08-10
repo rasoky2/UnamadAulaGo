@@ -20,12 +20,35 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
   final _contrasenaController = TextEditingController();
   bool _ocultarContrasena = true;
   bool _rememberMe = false;
+  String _usuarioSeleccionado = '19221011';
+
+  // Lista de usuarios de prueba
+  final List<Map<String, String>> _usuariosPrueba = [
+    {'codigo': '19221011', 'nombre': 'Estudiante Demo Uno', 'tipo': 'Estudiante'},
+    {'codigo': '19221012', 'nombre': 'Estudiante Demo Dos', 'tipo': 'Estudiante'},
+    {'codigo': 'prof01', 'nombre': 'Profesor Demo Uno', 'tipo': 'Profesor'},
+    {'codigo': 'prof02', 'nombre': 'Profesor Demo Dos', 'tipo': 'Profesor'},
+    {'codigo': 'admin01', 'nombre': 'Administrador Demo', 'tipo': 'Administrador'},
+  ];
+
+  void _cambiarUsuario(String codigo) {
+    setState(() {
+      _usuarioSeleccionado = codigo;
+      _codigoController.text = codigo;
+      _contrasenaController.text = '12345678';
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _cargarPreferencias();
     _verificarSesionExistente();
+    // Modo demo: autocompletar credenciales para presentación
+    // Puedes alternar entre admin/profesor/estudiante rápidamente
+    // Por defecto: estudiante demo
+    _codigoController.text = _codigoController.text.isEmpty ? '19221011' : _codigoController.text;
+    _contrasenaController.text = '12345678';
   }
 
   /// Verifica si hay una sesión activa al iniciar la app
@@ -240,11 +263,121 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                      // Selector de usuario demo
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.grey.shade50,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                        children: [
+                                Icon(
+                                  LucideIcons.userCheck,
+                                  size: 16,
+                                  color: Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Usuario de demostración',
+                                  style: GoogleFonts.notoSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _usuarioSeleccionado,
+                                isExpanded: true,
+                                icon: Icon(
+                                  LucideIcons.chevronDown,
+                                  size: 16,
+                                  color: Colors.grey.shade600,
+                                ),
+                                style: GoogleFonts.notoSans(
+                                  fontSize: 14,
+                                  color: Colors.black87,
+                                ),
+                                onChanged: (String? newValue) {
+                                  if (newValue != null) {
+                                    _cambiarUsuario(newValue);
+                                  }
+                                },
+                                items: _usuariosPrueba.map<DropdownMenuItem<String>>((Map<String, String> usuario) {
+                                  return DropdownMenuItem<String>(
+                                    value: usuario['codigo'],
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: usuario['tipo'] == 'Administrador' 
+                                                ? Colors.red.shade100
+                                                : usuario['tipo'] == 'Profesor'
+                                                ? Colors.blue.shade100
+                                                : Colors.green.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            usuario['tipo']!,
+                                            style: GoogleFonts.notoSans(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: usuario['tipo'] == 'Administrador' 
+                                                  ? Colors.red.shade700
+                                                  : usuario['tipo'] == 'Profesor'
+                                                  ? Colors.blue.shade700
+                                                  : Colors.green.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                usuario['nombre']!,
+                                                style: GoogleFonts.notoSans(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              Text(
+                                                usuario['codigo']!,
+                                                style: GoogleFonts.notoSans(
+                                                  fontSize: 11,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     // Campo código de usuario
                     _construirCampoTexto(
                       controller: _codigoController,
-                      icono: LucideIcons.user200,
-                      hintText: '19221011',
+                      icono: LucideIcons.user,
+                      hintText: 'Ej: 19221011',
                       validator: (valor) {
                         if (valor == null || valor.trim().isEmpty) {
                           return 'Ingresa tu código de usuario';
@@ -291,25 +424,6 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: 1,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Enlace "¿Olvidaste tu contraseña?" - Centrado
-                    Center(
-                      child: TextButton(
-                        onPressed: _mostrarDialogoAyuda,
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF2E5A96),
-                          padding: EdgeInsets.zero,
-                        ),
-                        child: Text(
-                          '¿Olvidaste tu contraseña?',
-                          style: GoogleFonts.notoSans(
-                            fontSize: 14,
-                            decoration: TextDecoration.underline,
                           ),
                         ),
                       ),
@@ -320,7 +434,7 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
               
               const SizedBox(height: 40),
               
-              // Información de usuario de prueba
+              // Información de acceso
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -334,13 +448,13 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                     Row(
                       children: [
                         Icon(
-                          LucideIcons.info200,
+                          LucideIcons.info,
                           size: 16,
                           color: Colors.blue.shade700,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Usuario de prueba',
+                          'Información de acceso',
                           style: GoogleFonts.notoSans(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -351,7 +465,7 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Código: 19221011\nContraseña: 123456789',
+                      'Usa el dropdown superior para seleccionar un usuario demo.\nTodos usan la contraseña: 12345678',
                       style: GoogleFonts.notoSans(
                         fontSize: 13,
                         color: Colors.blue.shade600,
@@ -428,12 +542,12 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
   Widget _construirCampoContrasena() {
     return _construirCampoTexto(
       controller: _contrasenaController,
-      icono: LucideIcons.lock200,
+      icono: LucideIcons.lock,
       hintText: '••••••••',
       obscureText: _ocultarContrasena,
       suffixIcon: IconButton(
         icon: Icon(
-          _ocultarContrasena ? LucideIcons.eyeOff200 : LucideIcons.eye200,
+          _ocultarContrasena ? LucideIcons.eyeOff : LucideIcons.eye,
           color: Colors.grey.shade600,
           size: 20,
         ),
@@ -599,81 +713,5 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
     );
   }
 
-  void _mostrarDialogoAyuda() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        title: Text(
-          'Recuperar Contraseña',
-          style: GoogleFonts.notoSans(
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF2E5A96),
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Para recuperar tu contraseña, comunícate con:',
-              style: GoogleFonts.notoSans(),
-            ),
-            const SizedBox(height: 16),
-            _construirInfoContacto(
-              icono: LucideIcons.mail200,
-              texto: 'soporte@unamad.edu.pe',
-            ),
-            const SizedBox(height: 8),
-            _construirInfoContacto(
-              icono: LucideIcons.phone200,
-              texto: '(082) 571-023',
-            ),
-            const SizedBox(height: 8),
-            _construirInfoContacto(
-              icono: LucideIcons.mapPin200,
-              texto: 'Oficina de Sistemas - UNAMAD',
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFE91E63),
-            ),
-            child: Text(
-              'Entendido',
-              style: GoogleFonts.notoSans(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _construirInfoContacto({
-    required IconData icono,
-    required String texto,
-  }) {
-    return Row(
-      children: [
-        Icon(
-          icono,
-          size: 16,
-          color: const Color(0xFF2E5A96),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          texto,
-          style: GoogleFonts.notoSans(
-            fontSize: 14,
-            color: Colors.grey.shade700,
-          ),
-        ),
-      ],
-    );
-  }
 } 

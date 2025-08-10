@@ -1,0 +1,10 @@
+^D:\AULAGO JAMES\AULAGO\BUILD\WINDOWS\X64\CMAKEFILES\00BAD8C711E101CCB91E41C3996F7769\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SD:/AulaGo James/aulago/windows" "-BD:/AulaGo James/aulago/build/windows/x64" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "D:/AulaGo James/aulago/build/windows/x64/aulago.sln"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

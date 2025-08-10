@@ -6,6 +6,7 @@ import 'package:aulago/screens/alumno/home.alumno.screen.dart';
 import 'package:aulago/screens/alumno/widgets/perfil.alumno.widget.dart';
 import 'package:aulago/screens/auth/login.screen.dart';
 import 'package:aulago/screens/profesor/profesor.layout.dart';
+import 'package:aulago/screens/admin/extras.admin.screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,6 +14,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String homeAlumno = '/home-alumno';
   static const String homeProfesor = '/home-profesor';
+  static const String profesorLecturas = '/profesor-lecturas';
   static const String homeAdmin = '/home-admin';
 
   static Map<String, Widget Function(BuildContext)> get routes {
@@ -47,6 +49,13 @@ class AppRoutes {
            titulo: 'Portal del Profesor',
          );
        },
+       // Acceso directo a Lecturas del profesor
+       profesorLecturas: (context) {
+         return const ProfesorLayout(
+           titulo: 'Portal del Profesor',
+           initialIndex: 6,
+         );
+       },
        
        // Ruta única de administración - AdminLayout maneja toda la navegación interna
        homeAdmin: (context) {
@@ -55,6 +64,8 @@ class AppRoutes {
            titulo: 'Panel Administrativo',
          );
        },
+       // Ruta directa a extras admin (opcional)
+       '/admin/extras': (context) => const PantallaExtrasAdmin(),
        '/cursos': (context) => const PantallaCursosAlumno(),
        '/perfil': (context) => Consumer(
   builder: (context, ref, _) {

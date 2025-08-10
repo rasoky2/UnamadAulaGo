@@ -1,0 +1,28 @@
+^D:\AULAGO JAMES\AULAGO\BUILD\WINDOWS\X64\CMAKEFILES\5AE9FE887957229C980988CB7C1FC502\FLUTTER_WINDOWS.DLL.RULE
+setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env FLUTTER_ROOT=D:\flutter "PROJECT_DIR=D:\AulaGo James\aulago" FLUTTER_ROOT=D:\flutter "FLUTTER_EPHEMERAL_DIR=D:\AulaGo James\aulago\windows\flutter\ephemeral" "PROJECT_DIR=D:\AulaGo James\aulago" "FLUTTER_TARGET=D:\AulaGo James\aulago\lib\main.dart" DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuMzUuMC0wLjEucHJl,RkxVVFRFUl9DSEFOTkVMPWJldGE=,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049YzBmMmExZGQ2MA==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049MWM5YzIwZTdjMw==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My45LjAgKGJ1aWxkIDMuOS4wLTMzMy4yLmJldGEp DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false "PACKAGE_CONFIG=D:\AulaGo James\aulago\.dart_tool\package_config.json" D:/flutter/packages/flutter_tools/bin/tool_backend.bat windows-x64 Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\AULAGO JAMES\AULAGO\BUILD\WINDOWS\X64\CMAKEFILES\3A9B98C2DB9A6E481E01D2408FA62AB9\FLUTTER_ASSEMBLE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\AULAGO JAMES\AULAGO\WINDOWS\FLUTTER\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SD:/AulaGo James/aulago/windows" "-BD:/AulaGo James/aulago/build/windows/x64" --check-stamp-file "D:/AulaGo James/aulago/build/windows/x64/flutter/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

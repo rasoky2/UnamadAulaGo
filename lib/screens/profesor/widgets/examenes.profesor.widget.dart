@@ -1,8 +1,15 @@
 import 'package:aulago/models/examen.model.dart';
-import 'package:aulago/providers/examen.riverpod.dart';
+import 'package:aulago/models/examen_entrega.model.dart';
+import 'package:aulago/models/pregunta_examen.model.dart';
+import 'package:aulago/repositories/examen.repository.dart';
+import 'package:aulago/repositories/examen_entrega.repository.dart';
+import 'package:aulago/screens/profesor/widgets/examen_creation_widgets.dart';
+import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ExamenesTab extends ConsumerStatefulWidget {
   const ExamenesTab({required this.cursoId, super.key});
@@ -28,18 +35,22 @@ class _ExamenesTabState extends ConsumerState<ExamenesTab> {
   }
 
   void _cargarExamenes() {
-    final examenRepo = ref.read(examenRepositoryProvider);
+    final examenRepo = ExamenRepository();
     setState(() {
-      _futureExamenes = examenRepo.obtenerExamenesPorCurso(widget.cursoId);
+      _futureExamenes = examenRepo
+          .obtenerExamenes()
+          .then((lista) => lista.where((e) => e.cursoId?.toString() == widget.cursoId).toList());
     });
   }
 
   Future<void> _mostrarDialogoCrearExamen() async {
-    final creado = await showDialog<bool>(
-      context: context,
-      builder: (context) => _DialogoCrearExamen(cursoId: widget.cursoId),
+    final resultado = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => _PantallaCrearExamen(cursoId: widget.cursoId),
+        fullscreenDialog: true,
+      ),
     );
-    if (creado == true) {
+    if (resultado == true) {
       _cargarExamenes();
     }
   }
@@ -47,7 +58,7 @@ class _ExamenesTabState extends ConsumerState<ExamenesTab> {
   Future<void> _mostrarDialogoEditarExamen(ModeloExamen examen) async {
     final editado = await showDialog<bool>(
       context: context,
-      builder: (context) => _DialogoCrearExamen(
+      builder: (context) => _PantallaCrearExamen(
         cursoId: widget.cursoId,
         examen: examen,
       ),
@@ -55,6 +66,30 @@ class _ExamenesTabState extends ConsumerState<ExamenesTab> {
     if (editado == true) {
       _cargarExamenes();
     }
+  }
+
+  /// Muestra el modal con las entregas del examen
+  void _mostrarEntregasModal(BuildContext context, ModeloExamen examen) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: _EntregasExamenWidget(
+            examen: examen,
+            scrollController: scrollController,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -106,9 +141,7 @@ class _ExamenesTabState extends ConsumerState<ExamenesTab> {
                           _mostrarDialogoEditarExamen(examen);
                         },
                       ),
-                      onTap: () {
-                        // TODO: Implementar detalle/calificación de examen
-                      },
+                      onTap: () => _mostrarEntregasModal(context, examen),
                     ),
                   );
                 },
@@ -121,14 +154,15 @@ class _ExamenesTabState extends ConsumerState<ExamenesTab> {
   }
 }
 
-// Cambia el retorno de showDialog a bool para indicar si se creó un examen
-class _DialogoCrearExamen extends ConsumerStatefulWidget {
-  const _DialogoCrearExamen({required this.cursoId, this.examen});
+// ==================== PANTALLA COMPLETA PARA CREAR EXAMEN ====================
+
+class _PantallaCrearExamen extends ConsumerStatefulWidget {
+  const _PantallaCrearExamen({required this.cursoId, this.examen});
   final String cursoId;
   final ModeloExamen? examen;
 
   @override
-  ConsumerState<_DialogoCrearExamen> createState() => _DialogoCrearExamenState();
+  ConsumerState<_PantallaCrearExamen> createState() => _PantallaCrearExamenState();
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
@@ -138,14 +172,26 @@ class _DialogoCrearExamen extends ConsumerStatefulWidget {
   }
 }
 
-class _DialogoCrearExamenState extends ConsumerState<_DialogoCrearExamen> {
+class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
   final _formKey = GlobalKey<FormState>();
+  final _pageController = PageController();
+  
+  // Controladores para información básica
   final _tituloController = TextEditingController();
   final _descripcionController = TextEditingController();
+  final _instruccionesController = TextEditingController();
   DateTime? _fechaInicio;
   DateTime? _fechaFin;
-  int? _duracion;
-  double? _puntosMaximos;
+  int _duracion = 120;
+  double _puntosMaximos = 20.0;
+  String _tipoExamen = 'parcial';
+  bool _aleatorizarPreguntas = false;
+  
+  // Lista de preguntas
+  List<PreguntaTemporal> _preguntas = [];
+  
+  // Estado
+  int _pasoActual = 0;
   bool _isLoading = false;
 
   @override
@@ -154,10 +200,16 @@ class _DialogoCrearExamenState extends ConsumerState<_DialogoCrearExamen> {
     if (widget.examen != null) {
       _tituloController.text = widget.examen!.titulo;
       _descripcionController.text = widget.examen!.descripcion ?? '';
+      _instruccionesController.text = widget.examen!.instrucciones ?? '';
       _fechaInicio = widget.examen!.fechaDisponible;
       _fechaFin = widget.examen!.fechaLimite;
-      _puntosMaximos = widget.examen!.calificacion ?? 0.0;
-      // No hay campo duracion en ModeloExamen, así que lo dejamos manual
+      _duracion = widget.examen!.duracionMinutos;
+      _puntosMaximos = widget.examen!.puntosMaximos;
+      _tipoExamen = widget.examen!.tipoExamen;
+      _aleatorizarPreguntas = widget.examen!.aleatorizarPreguntas;
+    } else {
+      // Agregar una pregunta inicial
+      _agregarPregunta();
     }
   }
 
@@ -165,50 +217,132 @@ class _DialogoCrearExamenState extends ConsumerState<_DialogoCrearExamen> {
   void dispose() {
     _tituloController.dispose();
     _descripcionController.dispose();
+    _instruccionesController.dispose();
+    _pageController.dispose();
+    for (final pregunta in _preguntas) {
+      pregunta.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) {
+  void _agregarPregunta() {
+    setState(() {
+      _preguntas.add(PreguntaTemporal());
+    });
+  }
+
+  void _eliminarPregunta(int index) {
+    if (_preguntas.length > 1) {
+      setState(() {
+        _preguntas[index].dispose();
+        _preguntas.removeAt(index);
+      });
+    }
+  }
+
+  void _siguientePaso() {
+    if (_pasoActual == 0) {
+      // Validar información básica
+      if (!_formKey.currentState!.validate()) return;
+      if (_fechaInicio == null || _fechaFin == null) {
+        _mostrarError('Por favor selecciona las fechas del examen');
+        return;
+      }
+      if (_fechaFin!.isBefore(_fechaInicio!)) {
+        _mostrarError('La fecha de fin debe ser posterior a la fecha de inicio');
+        return;
+      }
+    }
+
+    if (_pasoActual < 2) {
+      setState(() => _pasoActual++);
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _pasoAnterior() {
+    if (_pasoActual > 0) {
+      setState(() => _pasoActual--);
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _mostrarError(String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _guardarExamen() async {
+    // Validar preguntas
+    if (_preguntas.isEmpty) {
+      _mostrarError('Debes agregar al menos una pregunta');
       return;
     }
-    setState(() => _isLoading = true);
-    try {
-      final repo = ref.read(examenRepositoryProvider);
-      if (widget.examen == null) {
-        // Crear
-        await repo.crearExamen({
-          'titulo': _tituloController.text,
-          'descripcion': _descripcionController.text,
-          'fecha_disponible': _fechaInicio!.toIso8601String(),
-          'fecha_limite': _fechaFin!.toIso8601String(),
-          'duracion_minutos': _duracion,
-          'puntos_maximos': _puntosMaximos,
-          'curso_id': widget.cursoId,
-          'fecha_creacion': DateTime.now().toIso8601String(),
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
-        });
-      } else {
-        // Editar
-        await repo.actualizarExamen(widget.examen!.id, {
-          'titulo': _tituloController.text,
-          'descripcion': _descripcionController.text,
-          'fecha_disponible': _fechaInicio!.toIso8601String(),
-          'fecha_limite': _fechaFin!.toIso8601String(),
-          'duracion_minutos': _duracion,
-          'puntos_maximos': _puntosMaximos,
-          'curso_id': widget.cursoId,
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
-        });
+
+    for (int i = 0; i < _preguntas.length; i++) {
+      final pregunta = _preguntas[i];
+      if (!pregunta.esValida()) {
+        _mostrarError('La pregunta ${i + 1} está incompleta');
+        return;
       }
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final repo = ExamenRepository();
+      
+      // Crear el examen
+      final examen = ModeloExamen(
+        id: 0,
+        titulo: _tituloController.text,
+        descripcion: _descripcionController.text,
+        instrucciones: _instruccionesController.text,
+        fechaDisponible: _fechaInicio!,
+        fechaLimite: _fechaFin!,
+        duracionMinutos: _duracion,
+        puntosMaximos: _puntosMaximos,
+        tipoExamen: _tipoExamen,
+        aleatorizarPreguntas: _aleatorizarPreguntas,
+        estado: 'publicado',
+        fechaCreacion: DateTime.now(),
+        cursoId: int.tryParse(widget.cursoId),
+        fechaActualizacion: DateTime.now(),
+      );
+
+      // Convertir preguntas temporales a preguntas del modelo
+      final preguntas = _preguntas.map((p) => p.toPreguntaExamen()).toList();
+
+      // Crear examen con preguntas
+      await repo.crearExamenConPreguntas(
+        examen: examen,
+        preguntas: preguntas,
+      );
+
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Examen creado exitosamente'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
         Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar examen: $e'), backgroundColor: Colors.red),
-        );
+        _mostrarError('Error al crear examen: $e');
       }
     } finally {
       if (mounted) {
@@ -219,112 +353,1261 @@ class _DialogoCrearExamenState extends ConsumerState<_DialogoCrearExamen> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Crear Examen'),
-      content: Form(
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.examen == null ? 'Crear Examen' : 'Editar Examen'),
+        backgroundColor: Colors.blue.shade600,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          // Indicador de progreso
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                for (int i = 0; i < 3; i++) ...[
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: i <= _pasoActual ? Colors.blue : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  if (i < 2) const SizedBox(width: 8),
+                ],
+              ],
+            ),
+          ),
+          
+          // Títulos de pasos
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Información',
+                  style: TextStyle(
+                    fontWeight: _pasoActual == 0 ? FontWeight.bold : FontWeight.normal,
+                    color: _pasoActual == 0 ? Colors.blue : Colors.grey.shade600,
+                  ),
+                ),
+                Text(
+                  'Preguntas',
+                  style: TextStyle(
+                    fontWeight: _pasoActual == 1 ? FontWeight.bold : FontWeight.normal,
+                    color: _pasoActual == 1 ? Colors.blue : Colors.grey.shade600,
+                  ),
+                ),
+                Text(
+                  'Revisión',
+                  style: TextStyle(
+                    fontWeight: _pasoActual == 2 ? FontWeight.bold : FontWeight.normal,
+                    color: _pasoActual == 2 ? Colors.blue : Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Contenido de los pasos
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _construirPasoInformacion(),
+                _construirPasoPreguntas(),
+                _construirPasoRevision(),
+              ],
+            ),
+          ),
+
+          // Botones de navegación
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                if (_pasoActual > 0)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : _pasoAnterior,
+                      child: const Text('Anterior'),
+                    ),
+                  ),
+                if (_pasoActual > 0) const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : (_pasoActual == 2 ? _guardarExamen : _siguientePaso),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade600,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(_pasoActual == 2 ? 'Crear Examen' : 'Siguiente'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _construirPasoInformacion() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Información del Examen',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            
+            TextFormField(
+              controller: _tituloController,
+              decoration: const InputDecoration(
+                labelText: 'Título del examen',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(LucideIcons.fileText),
+              ),
+              validator: (v) => v == null || v.isEmpty ? 'El título es requerido' : null,
+            ),
+            const SizedBox(height: 16),
+            
+            TextFormField(
+              controller: _descripcionController,
+              decoration: const InputDecoration(
+                labelText: 'Descripción',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(LucideIcons.alignLeft),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            
+            TextFormField(
+              controller: _instruccionesController,
+              decoration: const InputDecoration(
+                labelText: 'Instrucciones para los estudiantes',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(LucideIcons.info),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 20),
+
+            // Fechas
+            const Text(
+              'Fechas',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: _seleccionarFechaInicio,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Fecha de inicio'),
+                          const SizedBox(height: 4),
+                          Text(
+                            _fechaInicio == null
+                                ? 'Seleccionar fecha'
+                                : DateFormat('dd/MM/yyyy HH:mm').format(_fechaInicio!),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _fechaInicio == null ? Colors.grey : Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: InkWell(
+                    onTap: _seleccionarFechaFin,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Fecha límite'),
+                          const SizedBox(height: 4),
+                          Text(
+                            _fechaFin == null
+                                ? 'Seleccionar fecha'
+                                : DateFormat('dd/MM/yyyy HH:mm').format(_fechaFin!),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _fechaFin == null ? Colors.grey : Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Configuración
+            const Text(
+              'Configuración',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    initialValue: _duracion.toString(),
+                    decoration: const InputDecoration(
+                      labelText: 'Duración (minutos)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(LucideIcons.clock),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (v) => v == null || int.tryParse(v) == null ? 'Requerido' : null,
+                    onChanged: (v) => _duracion = int.tryParse(v) ?? 120,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: _puntosMaximos.toString(),
+                    decoration: const InputDecoration(
+                      labelText: 'Puntos máximos',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(LucideIcons.award),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (v) => v == null || double.tryParse(v) == null ? 'Requerido' : null,
+                    onChanged: (v) => _puntosMaximos = double.tryParse(v) ?? 20.0,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            DropdownButtonFormField<String>(
+              value: _tipoExamen,
+              decoration: const InputDecoration(
+                labelText: 'Tipo de examen',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(LucideIcons.bookmark),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'parcial', child: Text('Examen Parcial')),
+                DropdownMenuItem(value: 'final', child: Text('Examen Final')),
+                DropdownMenuItem(value: 'practica', child: Text('Práctica')),
+                DropdownMenuItem(value: 'quiz', child: Text('Quiz')),
+              ],
+              onChanged: (v) => setState(() => _tipoExamen = v!),
+            ),
+            const SizedBox(height: 16),
+
+            SwitchListTile(
+              title: const Text('Aleatorizar preguntas'),
+              subtitle: const Text('Las preguntas aparecerán en orden aleatorio'),
+              value: _aleatorizarPreguntas,
+              onChanged: (v) => setState(() => _aleatorizarPreguntas = v),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _construirPasoPreguntas() {
+    return Column(
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              TextFormField(
-                controller: _tituloController,
-                decoration: const InputDecoration(labelText: 'Título'),
-                validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+              const Expanded(
+                child: Text(
+                  'Preguntas del Examen',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _descripcionController,
-                decoration: const InputDecoration(labelText: 'Descripción'),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(_fechaInicio == null ? 'Inicio: --' : 'Inicio: ${_fechaInicio!.toLocal()}'),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked != null) {
-                        final time = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.now(),
-                        );
-                        if (time != null) {
-                          setState(() {
-                            _fechaInicio = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
-                          });
-                        }
-                      }
-                    },
-                    child: const Text('Elegir'),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(_fechaFin == null ? 'Fin: --' : 'Fin: ${_fechaFin!.toLocal()}'),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _fechaInicio ?? DateTime.now(),
-                        firstDate: _fechaInicio ?? DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked != null) {
-                        final time = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.now(),
-                        );
-                        if (time != null) {
-                          setState(() {
-                            _fechaFin = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
-                          });
-                        }
-                      }
-                    },
-                    child: const Text('Elegir'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Duración (minutos)'),
-                keyboardType: TextInputType.number,
-                validator: (v) => v == null || int.tryParse(v) == null ? 'Requerido' : null,
-                onChanged: (v) => _duracion = int.tryParse(v),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Puntos máximos'),
-                keyboardType: TextInputType.number,
-                validator: (v) => v == null || double.tryParse(v) == null ? 'Requerido' : null,
-                onChanged: (v) => _puntosMaximos = double.tryParse(v),
+              ElevatedButton.icon(
+                onPressed: _agregarPregunta,
+                icon: const Icon(LucideIcons.plus, size: 16),
+                label: const Text('Agregar Pregunta'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                ),
               ),
             ],
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+
+        // Lista de preguntas
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _preguntas.length,
+            itemBuilder: (context, index) {
+              return PreguntaCard(
+                pregunta: _preguntas[index],
+                numero: index + 1,
+                onEliminar: _preguntas.length > 1 ? () => _eliminarPregunta(index) : null,
+              );
+            },
+          ),
         ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _guardar,
-          child: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Crear'),
+
+        // Resumen
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            border: Border(top: BorderSide(color: Colors.grey.shade300)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              ResumenItem(
+                icono: Icons.help_outline,
+                titulo: 'Preguntas',
+                valor: '${_preguntas.length}',
+              ),
+              ResumenItem(
+                icono: Icons.star,
+                titulo: 'Puntos Totales',
+                valor: '${_preguntas.fold<double>(0, (sum, p) => sum + p.puntos)}',
+              ),
+              ResumenItem(
+                icono: Icons.access_time,
+                titulo: 'Tiempo',
+                valor: '${_duracion}min',
+              ),
+            ],
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _construirPasoRevision() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Revisión del Examen',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 20),
+
+          // Información básica
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Información Básica',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  ItemRevision(titulo: 'Título', valor: _tituloController.text),
+                  ItemRevision(titulo: 'Descripción', valor: _descripcionController.text.isEmpty ? 'Sin descripción' : _descripcionController.text),
+                  ItemRevision(titulo: 'Tipo', valor: _tipoExamen),
+                  ItemRevision(titulo: 'Duración', valor: '$_duracion minutos'),
+                  ItemRevision(titulo: 'Puntos máximos', valor: '$_puntosMaximos'),
+                  if (_fechaInicio != null && _fechaFin != null) ...[
+                    ItemRevision(titulo: 'Inicio', valor: DateFormat('dd/MM/yyyy HH:mm').format(_fechaInicio!)),
+                    ItemRevision(titulo: 'Fin', valor: DateFormat('dd/MM/yyyy HH:mm').format(_fechaFin!)),
+                  ],
+                  ItemRevision(titulo: 'Aleatorizar', valor: _aleatorizarPreguntas ? 'Sí' : 'No'),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Preguntas
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Preguntas (${_preguntas.length})',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  for (int i = 0; i < _preguntas.length; i++) ...[
+                    PreguntaRevision(
+                      numero: i + 1,
+                      pregunta: _preguntas[i],
+                    ),
+                    if (i < _preguntas.length - 1) const Divider(),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _seleccionarFechaInicio() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fechaInicio ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_fechaInicio ?? DateTime.now()),
+      );
+      if (time != null) {
+        setState(() {
+          _fechaInicio = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
+        });
+      }
+    }
+  }
+
+  Future<void> _seleccionarFechaFin() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fechaFin ?? _fechaInicio ?? DateTime.now(),
+      firstDate: _fechaInicio ?? DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_fechaFin ?? DateTime.now()),
+      );
+      if (time != null) {
+        setState(() {
+          _fechaFin = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
+        });
+      }
+    }
+  }
+}
+
+// ==================== MODAL DE ENTREGAS DE EXAMEN ====================
+
+class _EntregasExamenWidget extends ConsumerStatefulWidget {
+  const _EntregasExamenWidget({
+    required this.examen,
+    required this.scrollController,
+  });
+
+  final ModeloExamen examen;
+  final ScrollController scrollController;
+
+  @override
+  ConsumerState<_EntregasExamenWidget> createState() => _EntregasExamenWidgetState();
+}
+
+class _EntregasExamenWidgetState extends ConsumerState<_EntregasExamenWidget> {
+  final ExamenEntregaRepository _entregaRepo = ExamenEntregaRepository();
+  late Future<List<Map<String, dynamic>>> _futureEntregas;
+  late Future<Map<String, dynamic>> _futureEstadisticas;
+  late Future<List<PreguntaExamen>> _futurePreguntas;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
+  }
+
+  void _cargarDatos() {
+    _futureEntregas = _entregaRepo.obtenerEntregasConEstudiante(widget.examen.id);
+    _futureEstadisticas = _entregaRepo.obtenerEstadisticasExamen(widget.examen.id);
+    _futurePreguntas = _entregaRepo.obtenerPreguntasExamen(widget.examen.id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Header del modal
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(LucideIcons.fileText, color: Colors.blue),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.examen.titulo,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(LucideIcons.x),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Fecha límite: ${DateFormat('dd/MM/yyyy HH:mm').format(widget.examen.fechaLimite)}',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              Text(
+                'Puntos máximos: ${widget.examen.puntosMaximos}',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+
+        // Estadísticas del examen
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: FutureBuilder<Map<String, dynamic>>(
+            future: _futureEstadisticas,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final stats = snapshot.data!;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _EstadisticaCard(
+                        titulo: 'Total',
+                        valor: '${stats['total_entregas']}',
+                        icono: LucideIcons.users,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _EstadisticaCard(
+                        titulo: 'Completadas',
+                        valor: '${stats['completadas']}',
+                        icono: LucideIcons.check,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _EstadisticaCard(
+                        titulo: 'Promedio',
+                        valor: '${stats['promedio_calificacion'].toStringAsFixed(1)}',
+                        icono: LucideIcons.trendingUp,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _EstadisticaCard(
+                        titulo: 'Aprobación',
+                        valor: '${stats['porcentaje_aprobacion'].toStringAsFixed(0)}%',
+                        icono: LucideIcons.award,
+                        color: Colors.purple,
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return const SizedBox(height: 80);
+            },
+          ),
+        ),
+
+        // Lista de entregas
+        Expanded(
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _futureEntregas,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error al cargar entregas',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        snapshot.error.toString(),
+                        style: TextStyle(color: Colors.grey.shade500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final entregas = snapshot.data ?? [];
+
+              if (entregas.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(LucideIcons.fileX, size: 64, color: Colors.grey.shade300),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No hay entregas para este examen',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return RefreshIndicator(
+                onRefresh: () async => _cargarDatos(),
+                child: ListView.builder(
+                  controller: widget.scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: entregas.length,
+                  itemBuilder: (context, index) {
+                    final entregaData = entregas[index];
+                    final entrega = ExamenEntrega.fromJson(entregaData);
+                    final estudiante = entregaData['estudiantes'];
+
+                    return _EntregaExamenCard(
+                      entrega: entrega,
+                      estudiante: estudiante,
+                      examen: widget.examen,
+                      onVerDetalle: () => _mostrarDetalleEntrega(entrega, estudiante),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Muestra el detalle de una entrega específica
+  void _mostrarDetalleEntrega(ExamenEntrega entrega, Map<String, dynamic> estudianteData) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: _DetalleEntregaWidget(
+            entrega: entrega,
+            estudiante: estudianteData,
+            examen: widget.examen,
+            preguntas: _futurePreguntas,
+            scrollController: scrollController,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EstadisticaCard extends StatelessWidget {
+  const _EstadisticaCard({
+    required this.titulo,
+    required this.valor,
+    required this.icono,
+    required this.color,
+  });
+
+  final String titulo;
+  final String valor;
+  final IconData icono;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icono, color: color, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            valor,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            titulo,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EntregaExamenCard extends StatelessWidget {
+  const _EntregaExamenCard({
+    required this.entrega,
+    required this.estudiante,
+    required this.examen,
+    required this.onVerDetalle,
+  });
+
+  final ExamenEntrega entrega;
+  final Map<String, dynamic> estudiante;
+  final ModeloExamen examen;
+  final VoidCallback onVerDetalle;
+
+  @override
+  Widget build(BuildContext context) {
+    final duracion = entrega.duracionMinutos;
+    final porcentaje = entrega.porcentajeCalificacion(examen.puntosMaximos);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onVerDetalle,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  AvatarWidget(
+                    fotoUrl: estudiante['foto_perfil_url'],
+                    nombreCompleto: estudiante['nombre_completo'],
+                    tipoUsuario: 'estudiante',
+                    radio: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          estudiante['nombre_completo'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          estudiante['codigo_estudiante'],
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (entrega.calificacion != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: (entrega.calificacion! >= 11) ? Colors.green : Colors.red,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${entrega.calificacion!.toStringAsFixed(1)}/20',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(LucideIcons.clock, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Duración: ${duracion != null ? '${duracion}min' : 'N/A'}',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  ),
+                  const SizedBox(width: 16),
+                  Icon(LucideIcons.check, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Correctas: ${entrega.respuestasCorrectas}/${entrega.respuestas.length}',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  ),
+                ],
+              ),
+              if (porcentaje != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: LinearProgressIndicator(
+                        value: porcentaje / 100,
+                        backgroundColor: Colors.grey.shade300,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          porcentaje >= 55 ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${porcentaje.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: porcentaje >= 55 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetalleEntregaWidget extends StatelessWidget {
+  const _DetalleEntregaWidget({
+    required this.entrega,
+    required this.estudiante,
+    required this.examen,
+    required this.preguntas,
+    required this.scrollController,
+  });
+
+  final ExamenEntrega entrega;
+  final Map<String, dynamic> estudiante;
+  final ModeloExamen examen;
+  final Future<List<PreguntaExamen>> preguntas;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  AvatarWidget(
+                    fotoUrl: estudiante['foto_perfil_url'],
+                    nombreCompleto: estudiante['nombre_completo'],
+                    tipoUsuario: 'estudiante',
+                    radio: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          estudiante['nombre_completo'],
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Código: ${estudiante['codigo_estudiante']}',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(LucideIcons.x),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _InfoChip(
+                    icono: LucideIcons.calendar,
+                    texto: DateFormat('dd/MM HH:mm').format(entrega.fechaInicio),
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(width: 8),
+                  _InfoChip(
+                    icono: LucideIcons.clock,
+                    texto: '${entrega.duracionMinutos ?? 0}min',
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 8),
+                  if (entrega.calificacion != null)
+                    _InfoChip(
+                      icono: LucideIcons.award,
+                      texto: '${entrega.calificacion!.toStringAsFixed(1)}/20',
+                      color: entrega.calificacion! >= 11 ? Colors.green : Colors.red,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Preguntas y respuestas
+        Expanded(
+          child: FutureBuilder<List<PreguntaExamen>>(
+            future: preguntas,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError || !snapshot.hasData) {
+                return const Center(child: Text('Error al cargar preguntas'));
+              }
+
+              final preguntasList = snapshot.data!;
+
+              return ListView.builder(
+                controller: scrollController,
+                padding: const EdgeInsets.all(16),
+                itemCount: preguntasList.length,
+                itemBuilder: (context, index) {
+                  final pregunta = preguntasList[index];
+                  final respuesta = entrega.respuestas.firstWhere(
+                    (r) => r.preguntaId == pregunta.id,
+                    orElse: () => const RespuestaExamen(
+                      preguntaId: -1,
+                      respuestaDada: 'Sin respuesta',
+                    ),
+                  );
+
+                  return _PreguntaRespuestaCard(
+                    pregunta: pregunta,
+                    respuesta: respuesta,
+                    numeroPregunta: index + 1,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({
+    required this.icono,
+    required this.texto,
+    required this.color,
+  });
+
+  final IconData icono;
+  final String texto;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icono, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            texto,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreguntaRespuestaCard extends StatelessWidget {
+  const _PreguntaRespuestaCard({
+    required this.pregunta,
+    required this.respuesta,
+    required this.numeroPregunta,
+  });
+
+  final PreguntaExamen pregunta;
+  final RespuestaExamen respuesta;
+  final int numeroPregunta;
+
+  @override
+  Widget build(BuildContext context) {
+    final esCorrecta = respuesta.esCorrecta ?? false;
+    final colorTema = esCorrecta ? Colors.green : Colors.red;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header de la pregunta
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: colorTema.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: colorTema.withValues(alpha: 0.3)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$numeroPregunta',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: colorTema,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    pregunta.enunciado,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colorTema,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        esCorrecta ? LucideIcons.check : LucideIcons.x,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${respuesta.puntosObtenidos ?? 0}/${pregunta.puntos}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Opciones
+            ...pregunta.opciones.asMap().entries.map((entry) {
+              final index = entry.key;
+              final opcion = entry.value;
+              final letra = String.fromCharCode(65 + index); // A, B, C, D
+              
+              final esRespuestaCorrecta = opcion == pregunta.respuestaCorrecta;
+              final esRespuestaDada = opcion == respuesta.respuestaDada;
+
+              Color? colorFondo;
+              Color? colorTexto;
+              IconData? icono;
+
+              if (esRespuestaCorrecta && esRespuestaDada) {
+                // Respuesta correcta seleccionada
+                colorFondo = Colors.green.withValues(alpha: 0.1);
+                colorTexto = Colors.green;
+                icono = LucideIcons.check;
+              } else if (esRespuestaCorrecta) {
+                // Respuesta correcta no seleccionada
+                colorFondo = Colors.green.withValues(alpha: 0.05);
+                colorTexto = Colors.green;
+                icono = LucideIcons.check;
+              } else if (esRespuestaDada) {
+                // Respuesta incorrecta seleccionada
+                colorFondo = Colors.red.withValues(alpha: 0.1);
+                colorTexto = Colors.red;
+                icono = LucideIcons.x;
+              }
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorFondo,
+                  borderRadius: BorderRadius.circular(8),
+                  border: colorTexto != null
+                      ? Border.all(color: colorTexto.withValues(alpha: 0.3))
+                      : Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: colorTexto?.withValues(alpha: 0.1) ?? Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: colorTexto?.withValues(alpha: 0.3) ?? Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          letra,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: colorTexto ?? Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        opcion,
+                        style: TextStyle(
+                          color: colorTexto ?? Colors.grey.shade800,
+                          fontWeight: colorTexto != null ? FontWeight.w500 : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    if (icono != null) ...[
+                      const SizedBox(width: 8),
+                      Icon(icono, size: 16, color: colorTexto),
+                    ],
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,10 +1,9 @@
 import 'package:aulago/models/tarea.model.dart';
 import 'package:aulago/models/usuario.model.dart';
-import 'package:aulago/providers/alumno/tarea.alumno.riverpod.dart';
 import 'package:aulago/providers/auth.riverpod.dart';
+import 'package:aulago/repositories/tarea.repository.dart';
 import 'package:aulago/screens/alumno/widgets/item_navegacion.widget.dart';
 import 'package:aulago/utils/constants.dart';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,17 +16,30 @@ class PantallaTareasAlumno extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tareasAsync = ref.watch(tareasAlumnoProvider);
     final estudiante = ref.watch(usuarioActualProvider);
+    final futureTareas = TareaRepository().obtenerTareas();
 
     if (estudiante == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return _TareasView(
-      estudiante: estudiante,
-      tareasAsync: tareasAsync,
-      onRetry: () => ref.invalidate(tareasAlumnoProvider),
+    return FutureBuilder<List<ModeloTarea>>(
+      future: futureTareas,
+      builder: (context, snapshot) {
+        final tareasAsync = snapshot.connectionState == ConnectionState.waiting
+            ? const AsyncValue<List<ModeloTarea>>.loading()
+            : snapshot.hasError
+                ? AsyncValue<List<ModeloTarea>>.error(snapshot.error!, StackTrace.current)
+                : AsyncValue<List<ModeloTarea>>.data(snapshot.data ?? []);
+        return _TareasView(
+          estudiante: estudiante,
+          tareasAsync: tareasAsync,
+          onRetry: () {
+            // No hay provider que invalidar; reconstruimos el FutureBuilder
+            (context as Element).markNeedsBuild();
+          },
+        );
+      },
     );
   }
 }
@@ -444,14 +456,14 @@ class _PanelLateral extends StatelessWidget {
           ItemNavegacion(titulo: 'Anuncios', icono: Icons.campaign_outlined, onTap: () {}),
           ItemNavegacion(titulo: 'Unidades', icono: Icons.folder_outlined, onTap: () {}),
           ItemNavegacion(titulo: 'Exámenes', icono: Icons.quiz_outlined, onTap: () {}),
-          ItemNavegacion(titulo: 'Foros', icono: Icons.forum_outlined, onTap: () {}),
-          ItemNavegacion(titulo: 'Lecturas', icono: Icons.book_outlined, onTap: () {}),
+
+
           ItemNavegacion(titulo: 'Tareas', icono: Icons.assignment_outlined, activo: true, onTap: () {}),
           ItemNavegacion(titulo: 'Calificaciones', icono: Icons.grade_outlined, onTap: () {}),
           ItemNavegacion(titulo: 'Calendario', icono: Icons.calendar_today_outlined, onTap: () {}),
-          ItemNavegacion(titulo: 'Chat', icono: Icons.chat_outlined, onTap: () {}),
-          ItemNavegacion(titulo: 'Grupos', icono: Icons.group_outlined, onTap: () {}),
-          ItemNavegacion(titulo: 'Videoconferencia', icono: Icons.video_call_outlined, onTap: () {}),
+
+
+
           ItemNavegacion(titulo: 'Wikis', icono: Icons.public_outlined, onTap: () {}),
         ],
       ),

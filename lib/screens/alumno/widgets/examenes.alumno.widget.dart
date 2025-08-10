@@ -1,13 +1,12 @@
 import 'package:aulago/models/examen.model.dart';
-import 'package:aulago/providers/examen.riverpod.dart';
+import 'package:aulago/repositories/examen.repository.dart';
 import 'package:aulago/screens/alumno/detalle_examen.alumno.screen.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-class ExamenesWidget extends ConsumerWidget {
+class ExamenesWidget extends StatelessWidget {
 
   const ExamenesWidget({
     super.key,
@@ -18,9 +17,9 @@ class ExamenesWidget extends ConsumerWidget {
   final String cursoId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final examenesAsync = ref.watch(examenesProvider(cursoId));
+  Widget build(BuildContext context) {
     debugPrint('[ExamenesWidget] Solicitando exámenes para cursoId: $cursoId');
+    final repo = ExamenRepository();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -59,37 +58,34 @@ class ExamenesWidget extends ConsumerWidget {
           const SizedBox(height: 24),
           
           // Tabla de exámenes
-          examenesAsync.when(
-            data: (examenes) {
-              debugPrint('[ExamenesWidget] Exámenes recibidos: cantidad =  [1m${examenes.length} [0m');
+          FutureBuilder<List<ModeloExamen>>(
+            future: repo.obtenerExamenes(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                debugPrint('[ExamenesWidget] Cargando exámenes...');
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                debugPrint('[ExamenesWidget] Error al cargar exámenes: ${snapshot.error}');
+                return Center(
+                  child: Text(
+                    'Error al cargar los exámenes: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red, fontSize: 16),
+                  ),
+                );
+              }
+              final lista = snapshot.data ?? [];
+              final examenes = lista.where((e) => e.cursoId?.toString() == cursoId).toList();
+              debugPrint('[ExamenesWidget] Exámenes recibidos: cantidad = ${examenes.length}');
               if (examenes.isEmpty) {
                 return const Center(
                   child: Text(
-                    "No hay exámenes disponibles",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppConstants.textSecondary,
-                    ),
+                    'No hay exámenes disponibles',
+                    style: TextStyle(fontSize: 16, color: AppConstants.textSecondary),
                   ),
                 );
               }
               return _construirTablaExamenes(context, examenes);
-            },
-            loading: () {
-              debugPrint('[ExamenesWidget] Cargando exámenes...');
-              return const Center(child: CircularProgressIndicator());
-            },
-            error: (err, stack) {
-              debugPrint('[ExamenesWidget] Error al cargar exámenes: $err');
-              return Center(
-                child: Text(
-                  "Error al cargar los exámenes: $err",
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontSize: 16,
-                  ),
-                ),
-              );
             },
           ),
         ],
@@ -104,7 +100,7 @@ class ExamenesWidget extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -148,17 +144,6 @@ class ExamenesWidget extends ConsumerWidget {
                 ),
                 Expanded(
                   child: Text(
-                    'Calificación',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
                     'Acciones',
                     style: TextStyle(
                       fontSize: 14,
@@ -184,10 +169,12 @@ class ExamenesWidget extends ConsumerWidget {
 
   Widget _construirFilaExamen(BuildContext context, ModeloExamen examen, int index) {
     final esParImpar = index % 2 == 0;
-    final String estado = examen.estadoEntrega ?? 'No iniciado';
+    final String estado = 'programado';
     final Color colorEstado = _obtenerColorEstado(estado);
     final String fechaInicioStr = DateFormat('dd/MM/yy HH:mm').format(examen.fechaDisponible);
     final String fechaFinStr = DateFormat('dd/MM/yy HH:mm').format(examen.fechaLimite);
+    final DateTime ahora = DateTime.now();
+    final bool disponible = ahora.isAfter(examen.fechaDisponible) && ahora.isBefore(examen.fechaLimite);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -215,7 +202,7 @@ class ExamenesWidget extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: colorEstado.withOpacity(0.1),
+                        color: colorEstado.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -241,25 +228,30 @@ class ExamenesWidget extends ConsumerWidget {
                 ),
               ),
               Expanded(
-                child: Text(
-                  examen.calificacion?.toString() ?? '-',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              Expanded(
                 child: Center(
                   child: ElevatedButton(
-                    onPressed: () {
-                      debugPrint('[ExamenesWidget] Botón VER presionado para examen: ${examen.titulo} | cursoId: $cursoId');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DetalleExamenAlumnoScreen(examen: examen),
-                        ),
-                      );
-                    },
-                    child: const Text('Ver'),
+                    onPressed: !disponible
+                        ? null
+                        : () async {
+                            final confirmar = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Iniciar examen'),
+                                content: Text('¿Deseas iniciar "${examen.titulo}" ahora? Tendrás ${examen.duracionMinutos} minutos o hasta la fecha de cierre.'),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+                                  ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Iniciar')),
+                                ],
+                              ),
+                            );
+                            if (confirmar == true) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => DetalleExamenAlumnoScreen(examen: examen)),
+                              );
+                            }
+                          },
+                    child: const Text('Iniciar'),
                   ),
                 ),
               ),

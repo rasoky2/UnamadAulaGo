@@ -1,10 +1,13 @@
-import 'package:aulago/models/entrega.model.dart';
+// import 'package:aulago/models/entrega.model.dart';
+// import 'package:aulago/models/tarea.model.dart';
+import 'package:aulago/models/calificacion.model.dart';
 import 'package:aulago/models/estudiante.model.dart';
-import 'package:aulago/providers/profesor/calificacion_tarea.riverpod.dart';
+import 'package:aulago/repositories/calificacion.repository.dart';
+import 'package:aulago/repositories/tarea.repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+// import 'package:intl/intl.dart';
 
 class CalificacionTareaScreen extends ConsumerWidget {
   const CalificacionTareaScreen({super.key, required this.tareaId});
@@ -12,97 +15,49 @@ class CalificacionTareaScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tareaDataAsync = ref.watch(calificacionTareaProvider(tareaId));
-
     return Scaffold(
       appBar: AppBar(
-        title: tareaDataAsync.when(
-          data: (data) => Text('Calificar: ${data.tarea.titulo}'),
-          loading: () => const Text('Cargando...'),
-          error: (_, __) => const Text('Error'),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(calificacionTareaProvider(tareaId).notifier).refrescar(),
-          )
-        ],
+        title: Text('Calificar tarea #$tareaId'),
       ),
-      body: tareaDataAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                'Error: ${err.toString()}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-            ],
-          ),
-        ),
-        data: (data) {
-          if (data.estudiantes.isEmpty) {
-            return const Center(
-                child: Text('No hay estudiantes matriculados en esta tarea.'));
+      body: FutureBuilder(
+        future: TareaRepository().obtenerTareaPorId(int.tryParse(tareaId) ?? 0),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
           }
-          
-          final mapaEntregas = { for (final e in data.entregas) e.estudianteId : e };
-
-          return ListView.builder(
-            itemCount: data.estudiantes.length,
-            itemBuilder: (context, index) {
-              final estudiante = data.estudiantes[index];
-              final entrega = mapaEntregas[estudiante.id];
-              final puntosMaximos = data.tarea.puntosMaximos;
-
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    child: Text(estudiante.iniciales),
-                  ),
-                  title: Text(estudiante.nombreCompleto),
-                  subtitle: Text(_estadoEntrega(entrega)),
-                  trailing: Chip(
-                    label: Text('${entrega?.calificacion?.toString() ?? '-'} / $puntosMaximos'),
-                    backgroundColor: entrega?.calificacion != null ? Colors.green.shade100 : Colors.grey.shade200,
-                  ),
-                  onTap: () => _mostrarDialogoCalificacion(context, ref, estudiante, entrega, puntosMaximos),
-                ),
-              );
-            },
+          final tarea = snapshot.data;
+          if (tarea == null) {
+            return const Center(child: Text('Tarea no encontrada'));
+          }
+          // Placeholder simple: solo muestra botón para asignar 0 a todos (sin listar estudiantes/entregas)
+          return Center(
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.assignment_late),
+              label: const Text('Registrar 0 manualmente'),
+              onPressed: () async {
+                final repo = CalificacionRepository();
+                await repo.crearCalificacion(Calificacion(
+                  id: 0,
+                  estudianteId: 0,
+                  tareaId: tarea.id,
+                  puntosObtenidos: 0,
+                  puntosTotales: tarea.puntosMaximos,
+                  fechaCalificacion: DateTime.now(),
+                ));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Calificación registrada')),
+                  );
+                }
+              },
+            ),
           );
         },
       ),
     );
   }
 
-  void _mostrarDialogoCalificacion(BuildContext context, WidgetRef ref, EstudianteAdmin estudiante, ModeloEntrega? entrega, double puntosMaximos) {
-    showDialog(
-      context: context,
-      builder: (_) => _DialogoCalificacionForm(
-        tareaId: tareaId,
-        estudiante: estudiante,
-        entrega: entrega,
-        puntosMaximos: puntosMaximos,
-      ),
-    );
-  }
-
-  String _estadoEntrega(ModeloEntrega? entrega) {
-    if (entrega == null) {
-      return 'No entregado';
-    }
-    if (entrega.calificacion != null) {
-      final fechaFormateada = DateFormat.yMd('es').add_jm().format(entrega.fechaEntrega);
-      return 'Calificado el $fechaFormateada';
-    }
-    return 'Entregado - Pendiente de calificar';
-  }
+  // Placeholder reducido, sin diálogo de calificación conectado
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
@@ -116,12 +71,11 @@ class _DialogoCalificacionForm extends ConsumerStatefulWidget {
   const _DialogoCalificacionForm({
     required this.tareaId,
     required this.estudiante,
-    this.entrega,
     required this.puntosMaximos,
   });
   final String tareaId;
   final EstudianteAdmin estudiante;
-  final ModeloEntrega? entrega;
+  // final ModeloEntrega? entrega;
   final double puntosMaximos;
 
   @override
@@ -133,7 +87,7 @@ class _DialogoCalificacionForm extends ConsumerStatefulWidget {
     properties
       ..add(StringProperty('tareaId', tareaId))
       ..add(DiagnosticsProperty<EstudianteAdmin>('estudiante', estudiante))
-      ..add(DiagnosticsProperty<ModeloEntrega?>('entrega', entrega))
+      // ..add(DiagnosticsProperty<ModeloEntrega?>('entrega', entrega))
       ..add(DoubleProperty('puntosMaximos', puntosMaximos));
   }
 }
@@ -147,8 +101,8 @@ class __DialogoCalificacionFormState extends ConsumerState<_DialogoCalificacionF
   @override
   void initState() {
     super.initState();
-    _notaController = TextEditingController(text: widget.entrega?.calificacion?.toString() ?? '');
-    _comentarioController = TextEditingController(text: widget.entrega?.comentarioProfesor ?? '');
+    _notaController = TextEditingController(text: '');
+    _comentarioController = TextEditingController(text: '');
   }
 
   Future<void> _submit() async {
@@ -159,13 +113,8 @@ class __DialogoCalificacionFormState extends ConsumerState<_DialogoCalificacionF
     setState(() => _isLoading = true);
 
     try {
-      final notifier = ref.read(calificacionTareaProvider(widget.tareaId).notifier);
-      await notifier.calificar(
-        estudianteId: widget.estudiante.id,
-        calificacion: double.parse(_notaController.text),
-        comentario: _comentarioController.text,
-        estado: double.parse(_notaController.text) == 0.0 ? EstadoEntrega.noEntregado : EstadoEntrega.calificado,
-      );
+      // Placeholder: sin provider; aquí iría la lógica para guardar usando repositorios CRUD
+      await Future<void>.delayed(const Duration(milliseconds: 10));
       if (mounted) {
         Navigator.of(context).pop();
       }

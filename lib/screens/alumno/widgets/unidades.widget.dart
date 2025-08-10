@@ -1,12 +1,11 @@
 import 'package:aulago/models/curso.model.dart';
-import 'package:aulago/providers/alumno/cursos.alumno.riverpod.dart';
+import 'package:aulago/repositories/curso.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-
-class UnidadesWidget extends ConsumerWidget {
+ 
+class UnidadesWidget extends StatelessWidget {
 
   const UnidadesWidget({
     super.key,
@@ -19,8 +18,8 @@ class UnidadesWidget extends ConsumerWidget {
   final ModeloCurso? curso;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final unidadesAsync = ref.watch(unidadesProvider(cursoId));
+  Widget build(BuildContext context) {
+    final repo = CursoRepository();
     
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -59,17 +58,21 @@ class UnidadesWidget extends ConsumerWidget {
           const SizedBox(height: 24),
           
           // Lista de unidades
-          unidadesAsync.when(
-            data: (unidades) {
-              debugPrint('🟢 [UnidadesWidget] Unidades recibidas: \u001b[32m${unidades.length}\u001b[0m');
-              for (final unidad in unidades) {
-                final temas = unidad['temas'] as List?;
-                debugPrint('  Unidad ${unidad['numero_unidad']} - Temas: ${temas?.length ?? 0}');
-                if (temas != null) {
-                  for (final tema in temas) {
-                    debugPrint('    Tema: ${tema['titulo']} | Tipo: ${tema['tipo']} | Detalles: ${tema['detalles'] != null ? 'sí' : 'no'}');
-                  }
-                }
+          FutureBuilder<ModeloCurso?>(
+            future: repo.obtenerCursoPorId(int.tryParse(cursoId) ?? 0),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return const Center(child: Text('Error: No se pudieron cargar las unidades'));
+              }
+              final unidades = snapshot.data?.unidades ?? [];
+              debugPrint('🟢 [UnidadesWidget] Unidades recibidas: ${unidades.length}');
+              for (final Map<String, dynamic> map in unidades) {
+                final listaTemas = map['temas'] as List?;
+                final numero = (map['numero_unidad'] ?? map['numero']);
+                debugPrint('  Unidad ${numero ?? '?'} - Temas: ${listaTemas?.length ?? 0}');
               }
               // ADVERTENCIA si faltan unidades
               final int? totalUnidades = curso?.totalUnidades;
@@ -101,27 +104,14 @@ class UnidadesWidget extends ConsumerWidget {
                 children: [
                   advertencia,
                   if (unidades.isEmpty)
-                    const Center(child: Text("No se encontraron unidades para este curso."))
+                    const Center(child: Text('No se encontraron unidades para este curso.'))
                   else
-                    _UnidadesList(unidades: unidades),
+                    _UnidadesList(
+                      unidades: unidades.cast<Map<String, dynamic>>(),
+                    ),
                 ],
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, stack) => Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error: ${err.toString()}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       ),
@@ -197,13 +187,13 @@ class __UnidadesListState extends State<_UnidadesList> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE91E63).withValues(alpha: 26), // 0.1 * 255 ≈ 26
+                          color: const Color(0xFFE91E63),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
                           LucideIcons.folder200,
-                          color: Color(0xFFE91E63),
-                          size: 24,
+                          color: Colors.white,
+                          size: 20,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -214,7 +204,7 @@ class __UnidadesListState extends State<_UnidadesList> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'UNIDAD ${unidad['numero_unidad']}',
+                              'UNIDAD ${_numeroUnidad(unidad)}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -223,7 +213,7 @@ class __UnidadesListState extends State<_UnidadesList> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              unidad['titulo'] as String,
+                              (unidad['titulo'] ?? 'Sin título').toString(),
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -232,7 +222,7 @@ class __UnidadesListState extends State<_UnidadesList> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              unidad['descripcion'] as String,
+                              (unidad['descripcion'] ?? '').toString(),
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppConstants.textSecondary,
@@ -262,10 +252,13 @@ class __UnidadesListState extends State<_UnidadesList> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Temas de la unidad
-                      ...List.generate((unidad['temas'] as List).length, (temaIndex) {
-                        final tema = (unidad['temas'] as List)[temaIndex];
-                        return _construirItemTema(tema);
-                      }),
+                       ...List.generate(((unidad['temas'] as List?) ?? const []).length, (temaIndex) {
+                         final dynamic temaRaw = ((unidad['temas'] as List?) ?? const [])[temaIndex];
+                         final Map<String, dynamic> tema = temaRaw is Map<String, dynamic>
+                             ? temaRaw
+                             : <String, dynamic>{'titulo': temaRaw?.toString() ?? 'Tema', 'tipo': 'lectura'};
+                         return _construirItemTema(tema);
+                       }),
                     ],
                   ),
                 ),
@@ -275,6 +268,11 @@ class __UnidadesListState extends State<_UnidadesList> {
         );
       }),
     );
+  }
+
+  String _numeroUnidad(Map<String, dynamic> unidad) {
+    final dynamic numero = unidad['numero_unidad'] ?? unidad['numero'];
+    return numero?.toString() ?? '?';
   }
 
   Widget _construirItemTema(Map<String, dynamic> tema) {
@@ -296,16 +294,13 @@ class __UnidadesListState extends State<_UnidadesList> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: colorTipo.withValues(alpha: 26), // 0.1 * 255 ≈ 26
+              color: colorTipo,
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: colorTipo.withValues(alpha: 51), // 0.2 * 255 ≈ 51
-              ),
             ),
             child: Icon(
-              _obtenerIconoPorTipo(tema['icono'] ?? 'file'),
-              color: colorTipo,
-              size: 20,
+              _obtenerIconoTema(tema),
+              color: Colors.white,
+              size: 16,
             ),
           ),
           const SizedBox(width: 16),
@@ -336,8 +331,37 @@ class __UnidadesListState extends State<_UnidadesList> {
     );
   }
 
+  IconData _obtenerIconoTema(Map<String, dynamic> tema) {
+    final String? tipo = tema['tipo']?.toString().toLowerCase();
+    switch (tipo) {
+      case 'lectura':
+        return Icons.menu_book_rounded;
+      case 'video':
+        return Icons.play_circle_fill_rounded;
+      case 'documento':
+        return Icons.description_rounded;
+      case 'tarea':
+        return Icons.assignment_rounded;
+      case 'foro':
+        return Icons.forum_rounded;
+    }
+    // Fallback a campo icono si viene explícito
+    final String icono = (tema['icono'] ?? 'file').toString();
+    return _obtenerIconoPorTipo(icono);
+  }
+
   IconData _obtenerIconoPorTipo(String tipoIcono) {
     switch (tipoIcono.toLowerCase()) {
+      case 'lectura':
+        return Icons.menu_book_rounded;
+      case 'video':
+        return Icons.play_circle_fill_rounded;
+      case 'documento':
+        return Icons.description_rounded;
+      case 'tarea':
+        return Icons.assignment_rounded;
+      case 'foro':
+        return Icons.forum_rounded;
       case 'message-square':
         return LucideIcons.messageSquare200;
       case 'play':

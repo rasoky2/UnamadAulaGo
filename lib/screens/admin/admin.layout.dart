@@ -1,12 +1,14 @@
 import 'package:aulago/models/estadisticas_admin.model.dart';
-import 'package:aulago/providers/admin/home.admin.riverpod.dart';
+import 'package:aulago/providers/admin/estadisticas.admin.riverpod.dart';
 import 'package:aulago/providers/auth.riverpod.dart';
+import 'package:aulago/screens/admin/alumno.admin.screen.dart';
 import 'package:aulago/screens/admin/carreras.admin.screen.dart';
 import 'package:aulago/screens/admin/cursos.admin.screen.dart';
-import 'package:aulago/screens/admin/alumno.admin.screen.dart';
+import 'package:aulago/screens/admin/extras.admin.screen.dart';
 import 'package:aulago/screens/admin/matricula.admin.screen.dart';
 import 'package:aulago/screens/admin/profesores.admin.screen.dart';
 import 'package:aulago/utils/constants.dart';
+import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,6 +69,8 @@ class _AdminLayoutState extends ConsumerState<AdminLayout> {
         return 'Gestión de Cursos';
       case 5:
         return 'Gestión de Carreras';
+      case 6:
+        return 'Extras (Anuncios y Fechas)';
       default:
         return 'Panel Principal';
     }
@@ -121,14 +125,10 @@ class _AdminLayoutState extends ConsumerState<AdminLayout> {
           ),
           // Menú de usuario
           PopupMenuButton<String>(
-            icon: const CircleAvatar(
-              backgroundColor: AppConstants.primaryColor,
-              radius: 16,
-              child: Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 16,
-              ),
+            icon: const AvatarWidget(
+              nombreCompleto: 'Administrador',
+              tipoUsuario: 'admin',
+              radio: 16,
             ),
             itemBuilder: (context) => [
               const PopupMenuItem<String>(
@@ -351,6 +351,18 @@ class _AdminLayoutState extends ConsumerState<AdminLayout> {
             ref.read(indiceNavegacionAdminProvider.notifier).state = 5;
           },
         ),
+        NavigationBarItem(
+          icon: Icons.event_note,
+          activeIcon: Icons.event,
+          onTap: () {
+            _pageController.animateToPage(
+              6,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+            ref.read(indiceNavegacionAdminProvider.notifier).state = 6;
+          },
+        ),
       ],
       style: MoonyNavStyle(
         activeColor: AppConstants.primaryColor,
@@ -372,6 +384,7 @@ class _AdminLayoutState extends ConsumerState<AdminLayout> {
       _PaginaAdminWrapper(child: _construirPaginaProfesores()),
       _PaginaAdminWrapper(child: _construirPaginaCursos()),
       _PaginaAdminWrapper(child: _construirPaginaCarreras()),
+      const _PaginaAdminWrapper(child: PantallaExtrasAdmin()),
     ];
   }
 
@@ -937,6 +950,13 @@ class _MenuNavegacion extends StatelessWidget {
             esCompacto: esCompacto,
             onTap: () => onItemSeleccionado(5),
           ),
+          _ItemMenu(
+            icono: Icons.event_note,
+            titulo: 'Extras',
+            indice: 6,
+            esCompacto: esCompacto,
+            onTap: () => onItemSeleccionado(6),
+          ),
         ],
       ),
     );
@@ -1230,17 +1250,10 @@ class _InfoUsuario extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: esCompacto ? 16 : 20,
-            backgroundColor: AppConstants.primaryColor,
-            child: Text(
-              'A',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: esCompacto ? 14 : 16,
-              ),
-            ),
+          AvatarWidget(
+            nombreCompleto: 'Administrador',
+            tipoUsuario: 'admin',
+            radio: esCompacto ? 16 : 20,
           ),
           if (!esCompacto) ...[
             const SizedBox(width: 12),
@@ -1296,17 +1309,10 @@ class _InfoUsuarioMovil extends StatelessWidget {
       ),
       child: const Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppConstants.primaryColor,
-            child: Text(
-              'A',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
+          AvatarWidget(
+            nombreCompleto: 'Administrador',
+            tipoUsuario: 'admin',
+            radio: 24,
           ),
           SizedBox(width: 16),
           Expanded(

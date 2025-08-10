@@ -1,14 +1,17 @@
+import 'package:aulago/models/curso.model.dart';
 import 'package:aulago/providers/auth.riverpod.dart';
-import 'package:aulago/providers/profesor/cursos.profesor.riverpod.dart' as cursos_riverpod;
+import 'package:aulago/repositories/curso.repository.dart';
 import 'package:aulago/screens/profesor/cursos.profesor.screen.dart';
+import 'package:aulago/screens/profesor/home.profesor.screen.dart';
 import 'package:aulago/screens/profesor/widgets/calificaciones.profesor.widget.dart';
 import 'package:aulago/screens/profesor/widgets/estudiantes.profesor.widget.dart';
 import 'package:aulago/screens/profesor/widgets/examenes.profesor.widget.dart';
+import 'package:aulago/screens/profesor/widgets/lecturas.profesor.widget.dart';
 import 'package:aulago/utils/constants.dart';
+import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:moony_nav_bar/moony_nav_bar.dart';
 
 // Provider para manejar el índice de la página actual del profesor
@@ -19,8 +22,10 @@ class ProfesorLayout extends ConsumerStatefulWidget {
   const ProfesorLayout({
     super.key,
     required this.titulo,
+    this.initialIndex = 0,
   });
   final String titulo;
+  final int initialIndex;
 
   @override
   ConsumerState<ProfesorLayout> createState() => _ProfesorLayoutState();
@@ -29,6 +34,7 @@ class ProfesorLayout extends ConsumerStatefulWidget {
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
     properties.add(StringProperty('titulo', titulo));
+    properties.add(IntProperty('initialIndex', initialIndex));
   }
 }
 
@@ -42,7 +48,10 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
     _pageController = PageController();
     // Inicializar el provider en 0 (página de inicio)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(indiceNavegacionProfesorProvider.notifier).state = 0;
+      ref.read(indiceNavegacionProfesorProvider.notifier).state = widget.initialIndex;
+      if (widget.initialIndex != 0) {
+        _pageController.jumpToPage(widget.initialIndex);
+      }
     });
   }
 
@@ -64,6 +73,10 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
         return 'Estudiantes';
       case 4:
         return 'Tareas';
+      case 5:
+        return 'Exámenes';
+      case 6:
+        return 'Lecturas';
       default:
         return 'Panel del Profesor';
     }
@@ -117,17 +130,11 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
             tooltip: 'Notificaciones',
           ),
           PopupMenuButton<String>(
-            icon: CircleAvatar(
-              backgroundColor: AppConstants.primaryColor,
-              radius: 16,
-              child: Text(
-                usuario.nombreCompleto.isNotEmpty ? usuario.nombreCompleto[0].toUpperCase() : 'P',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+            icon: AvatarWidget(
+              fotoUrl: usuario.fotoPerfilUrl,
+              nombreCompleto: usuario.nombreCompleto,
+              tipoUsuario: 'profesor',
+              radio: 16,
             ),
             itemBuilder: (context) => [
               const PopupMenuItem<String>(
@@ -232,17 +239,11 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.white.withValues(alpha: 0.2),
-                      child: Text(
-                        usuario.nombreCompleto.isNotEmpty ? usuario.nombreCompleto[0].toUpperCase() : 'P',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    AvatarWidget(
+                      fotoUrl: usuario.fotoPerfilUrl,
+                      nombreCompleto: usuario.nombreCompleto,
+                      tipoUsuario: 'profesor',
+                      radio: 30,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -381,142 +382,37 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
       _PaginaProfesorWrapper(child: _construirPaginaEstudiantes()),
       _PaginaProfesorWrapper(child: _construirPaginaTareas()),
       _PaginaProfesorWrapper(child: _construirPaginaExamenes()),
+      _PaginaProfesorWrapper(child: _construirPaginaLecturas()),
     ];
   }
 
   // Constructores de páginas
   Widget _construirPaginaInicio() {
-    // Reutilizar el contenido existente de home.profesor.screen.dart
-    final cursosAsync = ref.watch(cursos_riverpod.cursosProfesorProvider);
-    return cursosAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Error: ${err.toString()}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.refresh(cursos_riverpod.cursosProfesorProvider),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      ),
-      data: (cursos) {
-        if (cursos.isEmpty) {
-          return const Center(
-            child: Text('No tienes cursos asignados actualmente.'),
-          );
-        }
-        
-        return GridView.builder(
-          padding: const EdgeInsets.all(16.0),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 400,
-            childAspectRatio: 2.5,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-          ),
-          itemCount: cursos.length,
-          itemBuilder: (context, index) {
-            final curso = cursos[index];
-            return Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          curso.nombre,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          curso.codigoCurso,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PantallaGestionCurso(curso: curso),
-                              ),
-                            );
-                          },
-                          icon: const Icon(LucideIcons.arrowRight, size: 16),
-                          label: const Text('Gestionar'),
-                          style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+    return const PantallaDashboardProfesor();
   }
 
   Widget _construirPaginaCursos() {
-    final cursosAsync = ref.watch(cursos_riverpod.cursosProfesorProvider);
-    
-    return cursosAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Error: ${err.toString()}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
+    return FutureBuilder<List<ModeloCurso>>(
+      future: CursoRepository().obtenerTodos(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                const SizedBox(height: 16),
+                ElevatedButton(onPressed: () => setState(() {}), child: const Text('Reintentar')),
+              ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.refresh(cursos_riverpod.cursosProfesorProvider),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      ),
-      data: (cursos) {
+          );
+        }
+        final cursos = snapshot.data ?? <ModeloCurso>[];
         if (cursos.isEmpty) {
           return const Center(
             child: Column(
@@ -524,24 +420,15 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
               children: [
                 Icon(Icons.book_outlined, size: 64, color: Colors.grey),
                 SizedBox(height: 16),
-                Text(
-                  'No tienes cursos asignados',
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
-                ),
+                Text('No tienes cursos asignados', style: TextStyle(fontSize: 18, color: Colors.grey)),
                 SizedBox(height: 8),
-                Text(
-                  'Los cursos aparecerán aquí cuando te asignen materias',
-                  style: TextStyle(color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
+                Text('Los cursos aparecerán aquí cuando te asignen materias', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
               ],
             ),
           );
         }
-
         return Column(
           children: [
-            // Header con estadísticas
             Container(
               padding: const EdgeInsets.all(16),
               margin: const EdgeInsets.only(bottom: 16),
@@ -551,144 +438,47 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: _EstadisticaCurso(
-                      icono: Icons.book,
-                      titulo: 'Total Cursos',
-                      valor: cursos.length.toString(),
-                    ),
-                  ),
+                  Expanded(child: _EstadisticaCurso(icono: Icons.book, titulo: 'Total Cursos', valor: cursos.length.toString())),
                   const SizedBox(width: 16),
-                  const Expanded(
-                    child: _EstadisticaCurso(
-                      icono: Icons.schedule,
-                      titulo: 'Período',
-                      valor: '2025-I', // TODO: Obtener período actual
-                    ),
-                  ),
+                  const Expanded(child: _EstadisticaCurso(icono: Icons.schedule, titulo: 'Período', valor: '2025-I')),
                   const SizedBox(width: 16),
-                  const Expanded(
-                    child: _EstadisticaCurso(
-                      icono: Icons.people,
-                      titulo: 'Estudiantes',
-                      valor: '24', // TODO: Calcular total de estudiantes
-                    ),
-                  ),
+                  const Expanded(child: _EstadisticaCurso(icono: Icons.people, titulo: 'Estudiantes', valor: '24')),
                 ],
               ),
             ),
-
-            // Lista de cursos expandida
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: cursos.length,
-                itemBuilder: (context, index) {
-                  final curso = cursos[index];
-                  return CursoCardWidget(curso: curso);
-                },
-                                      ),
-                                    ),
-                                  ],
+                itemBuilder: (context, index) => CursoCardWidget(curso: cursos[index]),
+              ),
+            ),
+          ],
         );
       },
     );
   }
 
   Widget _construirPaginaCalificaciones() {
-    final cursosAsync = ref.watch(cursos_riverpod.cursosProfesorProvider);
     final ValueNotifier<String?> cursoSeleccionadoId = ValueNotifier<String?>(null);
-
-    return cursosAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('Error: ${err.toString()}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.refresh(cursos_riverpod.cursosProfesorProvider),
-              child: const Text('Reintentar'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-      data: (cursos) {
+    return FutureBuilder<List<ModeloCurso>>(
+      future: CursoRepository().obtenerTodos(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        final cursos = snapshot.data ?? <ModeloCurso>[];
         if (cursos.isEmpty) {
           return const Center(child: Text('No tienes cursos asignados.'));
         }
         return ValueListenableBuilder<String?>(
           valueListenable: cursoSeleccionadoId,
           builder: (context, cursoId, _) {
-            final cursoInicial = cursoId ?? cursos.first.id;
-            if (cursoSeleccionadoId.value == null) {
-              cursoSeleccionadoId.value = cursoInicial;
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: DropdownButton<String>(
-                    value: cursoInicial,
-                    isExpanded: true,
-                    items: cursos.map((c) => DropdownMenuItem(
-                      value: c.id,
-                      child: Text('${c.nombre} (${c.codigoCurso})'),
-                    )).toList(),
-                    onChanged: (nuevoId) {
-                      if (nuevoId != null) {
-                        cursoSeleccionadoId.value = nuevoId;
-                      }
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: CalificacionesTab(cursoId: cursoInicial),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _construirPaginaEstudiantes() {
-    final cursosAsync = ref.watch(cursos_riverpod.cursosProfesorProvider);
-    final ValueNotifier<String?> cursoSeleccionadoId = ValueNotifier<String?>(null);
-    
-    return cursosAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('Error: ${err.toString()}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.refresh(cursos_riverpod.cursosProfesorProvider),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      ),
-      data: (cursos) {
-        if (cursos.isEmpty) {
-          return const Center(child: Text('No tienes cursos asignados.'));
-        }
-        return ValueListenableBuilder<String?>(
-          valueListenable: cursoSeleccionadoId,
-          builder: (context, cursoId, _) {
-            final cursoInicial = cursoId ?? cursos.first.id;
-            if (cursoSeleccionadoId.value == null) {
-              cursoSeleccionadoId.value = cursoInicial;
-            }
+            final cursoInicial = cursoId ?? (cursos.isNotEmpty ? cursos.first.id.toString() : '');
+            cursoSeleccionadoId.value ??= cursoInicial;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -698,19 +488,57 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
                     value: cursoInicial,
                     isExpanded: true,
                     items: cursos.map((c) => DropdownMenuItem(
-                      value: c.id,
+                      value: c.id.toString(),
                       child: Text('${c.nombre} (${c.codigoCurso})'),
                     )).toList(),
-                    onChanged: (nuevoId) {
-                      if (nuevoId != null) {
-                        cursoSeleccionadoId.value = nuevoId;
-                      }
-                    },
+                    onChanged: (nuevoId) => cursoSeleccionadoId.value = nuevoId,
                   ),
                 ),
-                Expanded(
-                  child: EstudiantesTab(cursoId: cursoInicial),
+                Expanded(child: CalificacionesTab(cursoId: cursoInicial)),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _construirPaginaEstudiantes() {
+    final ValueNotifier<String?> cursoSeleccionadoId = ValueNotifier<String?>(null);
+    return FutureBuilder<List<ModeloCurso>>(
+      future: CursoRepository().obtenerTodos(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        final cursos = snapshot.data ?? <ModeloCurso>[];
+        if (cursos.isEmpty) {
+          return const Center(child: Text('No tienes cursos asignados.'));
+        }
+        return ValueListenableBuilder<String?>(
+          valueListenable: cursoSeleccionadoId,
+          builder: (context, cursoId, _) {
+            final cursoInicial = cursoId ?? (cursos.isNotEmpty ? cursos.first.id.toString() : '');
+            cursoSeleccionadoId.value ??= cursoInicial;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: DropdownButton<String>(
+                    value: cursoInicial,
+                    isExpanded: true,
+                    items: cursos.map((c) => DropdownMenuItem(
+                      value: c.id.toString(),
+                      child: Text('${c.nombre} (${c.codigoCurso})'),
+                    )).toList(),
+                    onChanged: (nuevoId) => cursoSeleccionadoId.value = nuevoId,
+                  ),
                 ),
+                Expanded(child: EstudiantesTab(cursoId: cursoInicial)),
               ],
             );
           },
@@ -720,60 +548,41 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
   }
 
   Widget _construirPaginaTareas() {
-    final cursosAsync = ref.watch(cursos_riverpod.cursosProfesorProvider);
-    // Estado local para el curso seleccionado
     final ValueNotifier<String?> cursoSeleccionadoId = ValueNotifier<String?>(null);
-
-    return cursosAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('Error: ${err.toString()}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.refresh(cursos_riverpod.cursosProfesorProvider),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      ),
-      data: (cursos) {
+    return FutureBuilder<List<ModeloCurso>>(
+      future: CursoRepository().obtenerTodos(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        final cursos = snapshot.data ?? <ModeloCurso>[];
         if (cursos.isEmpty) {
           return const Center(child: Text('No tienes cursos asignados.'));
         }
         return ValueListenableBuilder<String?>(
           valueListenable: cursoSeleccionadoId,
           builder: (context, cursoId, _) {
-            final cursoInicial = cursoId ?? cursos.first.id;
-            if (cursoSeleccionadoId.value == null) {
-              cursoSeleccionadoId.value = cursoInicial;
-            }
+            final cursoInicial = cursoId ?? (cursos.isNotEmpty ? cursos.first.id.toString() : '');
+            cursoSeleccionadoId.value ??= cursoInicial;
             return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: DropdownButton<String>(
                     value: cursoInicial,
                     isExpanded: true,
                     items: cursos.map((c) => DropdownMenuItem(
-                      value: c.id,
+                      value: c.id.toString(),
                       child: Text('${c.nombre} (${c.codigoCurso})'),
                     )).toList(),
-                    onChanged: (nuevoId) {
-                      if (nuevoId != null) {
-                        cursoSeleccionadoId.value = nuevoId;
-                      }
-                    },
+                    onChanged: (nuevoId) => cursoSeleccionadoId.value = nuevoId,
                   ),
                 ),
-                            Expanded(
-                  child: TareasTab(cursoId: cursoInicial),
-                ),
+                Expanded(child: TareasTab(cursoId: cursoInicial)),
               ],
             );
           },
@@ -783,62 +592,78 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
   }
 
   Widget _construirPaginaExamenes() {
-    final cursosAsync = ref.watch(cursos_riverpod.cursosProfesorProvider);
     final ValueNotifier<String?> cursoSeleccionadoId = ValueNotifier<String?>(null);
-
-    return cursosAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('Error: ${err.toString()}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.refresh(cursos_riverpod.cursosProfesorProvider),
-              child: const Text('Reintentar'),
-                            ),
-                          ],
-                        ),
-      ),
-      data: (cursos) {
+    return FutureBuilder<List<ModeloCurso>>(
+      future: CursoRepository().obtenerTodos(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        final cursos = snapshot.data ?? [];
         if (cursos.isEmpty) {
           return const Center(child: Text('No tienes cursos asignados.'));
         }
         return ValueListenableBuilder<String?>(
           valueListenable: cursoSeleccionadoId,
           builder: (context, cursoId, _) {
-            final cursoInicial = cursoId ?? cursos.first.id;
-            if (cursoSeleccionadoId.value == null) {
-              cursoSeleccionadoId.value = cursoInicial;
-            }
+            final cursoInicial = cursoId ?? (cursos.isNotEmpty ? cursos.first.id.toString() : '');
+            cursoSeleccionadoId.value ??= cursoInicial;
             return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: DropdownButton<String>(
                     value: cursoInicial,
                     isExpanded: true,
                     items: cursos.map((c) => DropdownMenuItem(
-                      value: c.id,
+                      value: c.id.toString(),
                       child: Text('${c.nombre} (${c.codigoCurso})'),
                     )).toList(),
-                    onChanged: (nuevoId) {
-                      if (nuevoId != null) {
-                        cursoSeleccionadoId.value = nuevoId;
-                      }
-                    },
+                    onChanged: (nuevoId) => cursoSeleccionadoId.value = nuevoId,
                   ),
                 ),
-                Expanded(
-                  child: ExamenesTab(cursoId: cursoInicial),
-                ),
+                Expanded(child: ExamenesTab(cursoId: cursoInicial)),
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _construirPaginaLecturas() {
+    return FutureBuilder<List<ModeloCurso>>(
+      future: CursoRepository().obtenerTodos(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        final cursos = snapshot.data ?? <ModeloCurso>[];
+        if (cursos.isEmpty) {
+          return const Center(child: Text('No tienes cursos asignados.'));
+        }
+        final cursoId = cursos.first.id.toString();
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.menu_book_outlined),
+                  const SizedBox(width: 8),
+                  Text('Lecturas - ${cursos.first.nombre}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            Expanded(child: LecturasTab(cursoId: cursoId)),
+          ],
         );
       },
     );
@@ -905,61 +730,7 @@ class _EstadisticaCurso extends StatelessWidget {
 }
 
 // Widget auxiliar para mostrar información
-class _InfoItem extends StatelessWidget {
-
-  const _InfoItem({
-    required this.icono,
-    required this.titulo,
-    required this.valor,
-  });
-  final IconData icono;
-  final String titulo;
-  final String valor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              icono,
-              size: 14,
-              color: AppConstants.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              titulo,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppConstants.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          valor,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppConstants.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties..add(DiagnosticsProperty<IconData>('icono', icono))
-    ..add(StringProperty('titulo', titulo))
-    ..add(StringProperty('valor', valor));
-  }
-}
+// _InfoItem eliminado por no ser utilizado
 
 // Wrapper para las páginas
 class _PaginaProfesorWrapper extends StatelessWidget {
@@ -1015,17 +786,11 @@ class _SidebarProfesor extends ConsumerWidget {
             padding: EdgeInsets.all(esTablet ? 16 : 24),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: esTablet ? 20 : 30,
-                  backgroundColor: AppConstants.primaryColor,
-                  child: Text(
-                    usuario.nombreCompleto.isNotEmpty ? usuario.nombreCompleto[0].toUpperCase() : 'P',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: esTablet ? 16 : 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                AvatarWidget(
+                  fotoUrl: usuario.fotoPerfilUrl,
+                  nombreCompleto: usuario.nombreCompleto,
+                  tipoUsuario: 'profesor',
+                  radio: esTablet ? 20 : 30,
                 ),
                 if (!esTablet) ...[
                   const SizedBox(height: 12),
@@ -1105,6 +870,14 @@ class _SidebarProfesor extends ConsumerWidget {
                     esCompacto: esTablet,
                     esActivo: indiceActual == 5,
                     onTap: () => onItemSeleccionado(5),
+                  ),
+                  _ItemMenu(
+                    icono: Icons.menu_book,
+                    titulo: 'Lecturas',
+                    indice: 6,
+                    esCompacto: esTablet,
+                    esActivo: indiceActual == 6,
+                    onTap: () => onItemSeleccionado(6),
                   ),
                 ],
               ),
@@ -1186,16 +959,11 @@ class _HeaderProfesor extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               PopupMenuButton<String>(
-                child: CircleAvatar(
-                  backgroundColor: AppConstants.primaryColor,
-                  child: Text(
-                    usuario.nombreCompleto.isNotEmpty ? usuario.nombreCompleto[0].toUpperCase() : 'P',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                child: AvatarWidget(
+                  fotoUrl: usuario.fotoPerfilUrl,
+                  nombreCompleto: usuario.nombreCompleto,
+                  tipoUsuario: 'profesor',
+                  radio: 18,
                 ),
                 itemBuilder: (context) => [
                   const PopupMenuItem<String>(
@@ -1376,6 +1144,16 @@ class _MenuNavegacionMovil extends ConsumerWidget {
             Navigator.of(context).pop();
           },
         ),
+        _ItemMenuMovil(
+          icono: Icons.menu_book,
+          titulo: 'Lecturas',
+          indice: 6,
+          esActivo: indiceActual == 6,
+          onTap: () {
+            ref.read(indiceNavegacionProfesorProvider.notifier).state = 6;
+            Navigator.of(context).pop();
+          },
+        ),
       ],
     );
   }
@@ -1449,3 +1227,4 @@ class _ItemMenuMovil extends StatelessWidget {
     ..add(ObjectFlagProperty<VoidCallback>.has('onTap', onTap));
   }
 }
+
