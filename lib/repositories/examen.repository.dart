@@ -1,9 +1,8 @@
-import 'package:aulago/models/entrega.model.dart';
 import 'package:aulago/models/examen.model.dart';
+import 'package:aulago/models/pregunta_examen.model.dart';
 import 'package:aulago/repositories/base.repository.dart';
-import 'package:aulago/utils/logger.dart';
+import 'package:flutter/foundation.dart';
 
-/// Repositorio para gestión de exámenes
 class ExamenRepository extends BaseRepository<ModeloExamen> {
   @override
   String get tableName => 'examenes';
@@ -18,198 +17,143 @@ class ExamenRepository extends BaseRepository<ModeloExamen> {
   
   @override
   Map<String, dynamic> toJson(ModeloExamen entity) {
-    return {
-      'id': entity.id,
-      'titulo': entity.titulo,
-      'descripcion': entity.descripcion,
-      'fecha_disponible': entity.fechaDisponible.toIso8601String(),
-      'fecha_limite': entity.fechaLimite.toIso8601String(),
-      'fecha_creacion': entity.fechaCreacion.toIso8601String(),
-    };
+    return entity.toJson();
   }
-  
+
   @override
   String getId(ModeloExamen entity) {
-    return entity.id;
+    return entity.id.toString();
   }
 
-  /// Obtener exámenes de un curso
-  Future<List<ModeloExamen>> obtenerExamenesPorCurso(String cursoId) async {
+  // CRUD básico
+  Future<List<ModeloExamen>> obtenerExamenes() async {
+    final result = await obtener(limite: 1000, offset: 0);
+    return result.items;
+  }
+
+  Future<ModeloExamen?> obtenerExamenPorId(int id) async {
+    return obtenerPorId(id.toString());
+  }
+
+  Future<ModeloExamen> crearExamen(ModeloExamen examen) async {
+    return crear(examen.toJson());
+  }
+
+  Future<ModeloExamen> actualizarExamen(int id, ModeloExamen examen) async {
+    return actualizar(id.toString(), examen.toJson());
+  }
+
+  Future<bool> eliminarExamen(int id) async {
+    await eliminar(id.toString());
+    return true;
+  }
+
+  // ==================== MÉTODOS PARA PREGUNTAS ====================
+
+  /// Crea un examen completo con sus preguntas
+  Future<ModeloExamen> crearExamenConPreguntas({
+    required ModeloExamen examen,
+    required List<PreguntaExamen> preguntas,
+  }) async {
     try {
-      final filtros = {'curso_id': cursoId};
-
-      final respuesta = await supabase
-          .from('examenes')
-          .select()
-          .match(filtros)
-          .order('fecha_disponible', ascending: true);
-
-      ApiLogger.logGet(
-        table: 'examenes',
-        statusCode: 200,
-        response: respuesta,
-        filters: filtros,
-      );
-
-      return (respuesta as List)
-          .map((json) => ModeloExamen.fromJson(json))
-          .toList();
+      debugPrint('[$repositoryName] Creando examen con ${preguntas.length} preguntas');
+      
+      // 1. Crear el examen
+      final examenCreado = await crearExamen(examen);
+      
+      // 2. Crear las preguntas asociadas
+      for (final pregunta in preguntas) {
+        final preguntaParaCrear = pregunta.copyWith(examenId: examenCreado.id);
+        await _crearPregunta(preguntaParaCrear);
+      }
+      
+      debugPrint('[$repositoryName] Examen creado exitosamente con ID: ${examenCreado.id}');
+      return examenCreado;
     } catch (e) {
-      ApiLogger.logError(
-        operation: 'GET',
-        table: 'examenes',
-        error: e,
-        additionalInfo: 'curso_id: $cursoId',
-      );
+      debugPrint('[$repositoryName] Error al crear examen con preguntas: $e');
       rethrow;
     }
   }
 
-  /// Obtener un examen por ID
-  Future<ModeloExamen?> obtenerExamenPorId(String id) async {
-    return obtenerPorId(id);
-  }
-
-  /// Crear un nuevo examen
-  Future<ModeloExamen> crearExamen(Map<String, dynamic> datos) async {
-    return crear(datos);
-  }
-
-  /// Actualizar un examen existente
-  Future<ModeloExamen> actualizarExamen(String id, Map<String, dynamic> datos) async {
+  /// Crea una pregunta individual
+  Future<PreguntaExamen> _crearPregunta(PreguntaExamen pregunta) async {
     try {
-      final respuesta = await supabase
-          .from('examenes')
-          .update(datos)
-          .match({'id': id})
+      final response = await supabase
+          .from('preguntas_examen')
+          .insert(pregunta.toJson())
           .select()
           .single();
-
-      ApiLogger.logUpdate(
-        table: 'examenes',
-        statusCode: 200,
-        response: respuesta,
-        requestBody: datos,
-      );
-
-      return ModeloExamen.fromJson(respuesta);
+      
+      return PreguntaExamen.fromJson(response);
     } catch (e) {
-      ApiLogger.logError(
-        operation: 'UPDATE',
-        table: 'examenes',
-        error: e,
-        additionalInfo: 'ID: $id, Datos: $datos',
-      );
+      debugPrint('[$repositoryName] Error al crear pregunta: $e');
       rethrow;
     }
   }
 
-  /// Eliminar un examen
-  Future<void> eliminarExamen(String id) async {
+  /// Obtiene las preguntas de un examen
+  Future<List<PreguntaExamen>> obtenerPreguntasExamen(int examenId) async {
     try {
-      final result = await supabase
-          .from('examenes')
-          .delete()
-          .match({'id': id});
-
-      ApiLogger.logDelete(
-        table: 'examenes',
-        statusCode: 204,
-        response: result,
-        id: id,
-      );
-    } catch (e) {
-      ApiLogger.logError(
-        operation: 'DELETE',
-        table: 'examenes',
-        error: e,
-        additionalInfo: 'ID: $id',
-      );
-      rethrow;
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> obtenerExamenesConEntregas(String grupoClaseId) async {
-    try {
-      final parametros = {'p_grupo_clase_id': grupoClaseId};
-
-      final result = await supabase.rpc(
-        'obtener_examenes_con_entregas',
-        params: parametros,
-      );
-
-      ApiLogger.logRpc(
-        functionName: 'obtener_examenes_con_entregas',
-        statusCode: 200,
-        response: result,
-        params: parametros,
-      );
-
-      return List<Map<String, dynamic>>.from(result);
-    } catch (e) {
-      ApiLogger.logError(
-        operation: 'RPC',
-        table: 'obtener_examenes_con_entregas',
-        error: e,
-        additionalInfo: 'grupo_clase_id: $grupoClaseId',
-      );
-      rethrow;
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> obtenerMensajesChatGrupal(String grupoClaseId) async {
-    try {
-      final parametros = {'p_grupo_clase_id': grupoClaseId};
-
-      final result = await supabase.rpc(
-        'obtener_mensajes_chat_grupal',
-        params: parametros,
-      );
-
-      ApiLogger.logRpc(
-        functionName: 'obtener_mensajes_chat_grupal',
-        statusCode: 200,
-        response: result,
-        params: parametros,
-      );
-
-      return List<Map<String, dynamic>>.from(result);
-    } catch (e) {
-      ApiLogger.logError(
-        operation: 'RPC',
-        table: 'obtener_mensajes_chat_grupal',
-        error: e,
-        additionalInfo: 'grupo_clase_id: $grupoClaseId',
-      );
-      rethrow;
-    }
-  }
-
-  /// Obtener entregas de un examen por examenId (como ModeloEntrega)
-  Future<List<ModeloEntrega>> obtenerEntregasPorExamen(String examenId) async {
-    try {
-      final respuesta = await supabase
-          .from('entregas')
+      debugPrint('[$repositoryName] Obteniendo preguntas para examen: $examenId');
+      
+      final response = await supabase
+          .from('preguntas_examen')
           .select()
-          .eq('examen_id', examenId);
+          .eq('examen_id', examenId)
+          .order('id');
 
-      ApiLogger.logGet(
-        table: 'entregas',
-        statusCode: 200,
-        response: respuesta,
-        filters: {'examen_id': examenId},
-      );
-
-      return (respuesta as List)
-          .map((json) => ModeloEntrega.fromJson(json))
-          .toList();
+      final preguntas = response.map(PreguntaExamen.fromJson).toList();
+      debugPrint('[$repositoryName] Preguntas obtenidas: ${preguntas.length}');
+      return preguntas;
     } catch (e) {
-      ApiLogger.logError(
-        operation: 'GET',
-        table: 'entregas',
-        error: e,
-        additionalInfo: 'examen_id: $examenId',
-      );
+      debugPrint('[$repositoryName] Error al obtener preguntas: $e');
+      rethrow;
+    }
+  }
+
+  /// Actualiza una pregunta
+  Future<PreguntaExamen> actualizarPregunta(int id, PreguntaExamen pregunta) async {
+    try {
+      final response = await supabase
+          .from('preguntas_examen')
+          .update(pregunta.toJson())
+          .eq('id', id)
+          .select()
+          .single();
+      
+      return PreguntaExamen.fromJson(response);
+    } catch (e) {
+      debugPrint('[$repositoryName] Error al actualizar pregunta: $e');
+      rethrow;
+    }
+  }
+
+  /// Elimina una pregunta
+  Future<bool> eliminarPregunta(int id) async {
+    try {
+      await supabase
+          .from('preguntas_examen')
+          .delete()
+          .eq('id', id);
+      
+      return true;
+    } catch (e) {
+      debugPrint('[$repositoryName] Error al eliminar pregunta: $e');
+      rethrow;
+    }
+  }
+
+  /// Elimina todas las preguntas de un examen
+  Future<bool> eliminarPreguntasExamen(int examenId) async {
+    try {
+      await supabase
+          .from('preguntas_examen')
+          .delete()
+          .eq('examen_id', examenId);
+      
+      return true;
+    } catch (e) {
+      debugPrint('[$repositoryName] Error al eliminar preguntas del examen: $e');
       rethrow;
     }
   }

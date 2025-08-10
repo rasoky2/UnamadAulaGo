@@ -1,11 +1,16 @@
+import 'package:aulago/models/entrega.model.dart';
+
 import 'package:aulago/models/tarea.model.dart';
-import 'package:aulago/providers/profesor/tareas.profesor.riverpod.dart';
+import 'package:aulago/repositories/entrega.repository.dart';
+import 'package:aulago/repositories/tarea.repository.dart';
 import 'package:aulago/screens/profesor/widgets/calificacion_tarea.widget.dart';
+import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TareasTab extends ConsumerWidget {
   const TareasTab({required this.cursoId, super.key});
@@ -13,24 +18,30 @@ class TareasTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tareasAsync = ref.watch(tareasProfesorProvider(cursoId));
-    return tareasAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(
+    final tareasFuture = TareaRepository().obtenerTareas();
+    return FutureBuilder<List<ModeloTarea>>(
+      future: tareasFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.error, size: 64, color: Colors.red),
             const SizedBox(height: 16),
             Text(
-              'Error:   [31m${err.toString()}',
+              'Error: ${snapshot.error}',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.red),
             ),
           ],
         ),
-      ),
-      data: (tareas) {
+          );
+        }
+        final tareas = (snapshot.data ?? []).where((t) => t.cursoId.toString() == cursoId).toList();
         if (tareas.isEmpty) {
           return Center(
             child: Column(
@@ -72,7 +83,7 @@ class TareasTab extends ConsumerWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CalificacionTareaScreen(tareaId: tarea.id),
+                     builder: (context) => CalificacionTareaScreen(tareaId: tarea.id.toString()),
                   ),
                 );
               },
@@ -147,9 +158,9 @@ class _TareaCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  onPressed: onGrade,
+                  onPressed: () => _mostrarEntregasModal(context, tarea),
                   icon: const Icon(LucideIcons.graduationCap, size: 16),
-                  label: const Text('Calificar'),
+                  label: const Text('Ver Entregas'),
                 ),
               ],
             )
@@ -231,20 +242,31 @@ class _TareaFormState extends ConsumerState<_TareaForm> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      final datosTarea = {
-        'curso_id': widget.cursoId,
-        'titulo': _tituloController.text,
-        'descripcion': _descripcionController.text,
-        'fecha_entrega': _fechaEntrega.toIso8601String(),
-        'puntos_maximos': double.tryParse(_puntosController.text) ?? 20.0,
-      };
+      // Datos construidos directamente al crear/actualizar vía repositorio
 
       try {
-        final notifier = ref.read(tareasProfesorProvider(widget.cursoId).notifier);
+        final repo = TareaRepository();
         if (widget.tarea == null) {
-          await notifier.crearTarea(datosTarea);
+          await repo.crearTarea(ModeloTarea(
+            id: 0,
+            titulo: _tituloController.text,
+            descripcion: _descripcionController.text,
+            fechaAsignacion: DateTime.now(),
+            fechaEntrega: _fechaEntrega,
+            puntosMaximos: double.tryParse(_puntosController.text) ?? 20.0,
+            estado: 'activa',
+            cursoId: int.tryParse(widget.cursoId) ?? 0,
+            fechaCreacion: DateTime.now(),
+            fechaActualizacion: DateTime.now(),
+          ));
         } else {
-          await notifier.actualizarTarea(widget.tarea!.id, datosTarea);
+          await repo.actualizarTarea(widget.tarea!.id, widget.tarea!.copyWith(
+            titulo: _tituloController.text,
+            descripcion: _descripcionController.text,
+            fechaEntrega: _fechaEntrega,
+            puntosMaximos: double.tryParse(_puntosController.text) ?? widget.tarea!.puntosMaximos,
+            fechaActualizacion: DateTime.now(),
+          ));
         }
         if (mounted) {
           widget.onSuccess();
@@ -335,6 +357,649 @@ class _TareaFormState extends ConsumerState<_TareaForm> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ==================== MODAL DE ENTREGAS ====================
+
+/// Muestra el modal bottom sheet con las entregas de una tarea
+void _mostrarEntregasModal(BuildContext context, ModeloTarea tarea) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Header del modal
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Indicador de arrastre
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Título de la tarea
+                  Text(
+                    tarea.titulo,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Información de la tarea
+                  Row(
+                    children: [
+                      Icon(LucideIcons.calendar, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Entrega: ${DateFormat.yMMMEd('es').add_jm().format(tarea.fechaEntrega)}',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                      const Spacer(),
+                      Chip(
+                        label: Text('${tarea.puntosMaximos.toInt()} pts'),
+                        backgroundColor: Colors.blue.shade100,
+                        labelStyle: TextStyle(color: Colors.blue.shade700),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Lista de entregas
+            Expanded(
+              child: _EntregasListWidget(
+                tarea: tarea,
+                scrollController: scrollController,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Widget que muestra la lista de entregas
+class _EntregasListWidget extends ConsumerStatefulWidget {
+  const _EntregasListWidget({
+    required this.tarea,
+    required this.scrollController,
+  });
+
+  final ModeloTarea tarea;
+  final ScrollController scrollController;
+
+  @override
+  ConsumerState<_EntregasListWidget> createState() => _EntregasListWidgetState();
+}
+
+class _EntregasListWidgetState extends ConsumerState<_EntregasListWidget> {
+  final EntregaRepository _entregaRepo = EntregaRepository();
+  late Future<List<Map<String, dynamic>>> _entregasFuture;
+  
+  @override
+  void initState() {
+    super.initState();
+    _cargarEntregas();
+  }
+
+  void _cargarEntregas() {
+    _entregasFuture = _entregaRepo.obtenerEntregasConEstudiante(widget.tarea.id);
+  }
+
+  void _refrescarEntregas() {
+    setState(() {
+      _cargarEntregas();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _entregasFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+                const SizedBox(height: 16),
+                Text(
+                  'Error al cargar entregas',
+                  style: TextStyle(color: Colors.red.shade700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _refrescarEntregas,
+                  icon: const Icon(LucideIcons.refreshCw, size: 16),
+                  label: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final entregas = snapshot.data ?? [];
+        
+        if (entregas.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(LucideIcons.fileX, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+                Text(
+                  'Sin entregas',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Aún no hay estudiantes que hayan entregado esta tarea.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async => _refrescarEntregas(),
+          child: ListView.builder(
+            controller: widget.scrollController,
+            padding: const EdgeInsets.all(16),
+            itemCount: entregas.length,
+            itemBuilder: (context, index) {
+              final entregaData = entregas[index];
+              final entrega = ModeloEntrega.fromJson(entregaData);
+              final estudiante = entregaData['estudiantes'] as Map<String, dynamic>;
+              
+              return _EntregaCard(
+                entrega: entrega,
+                estudiante: estudiante,
+                tarea: widget.tarea,
+                onActualizado: _refrescarEntregas,
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Card individual de una entrega
+class _EntregaCard extends StatelessWidget {
+  const _EntregaCard({
+    required this.entrega,
+    required this.estudiante,
+    required this.tarea,
+    required this.onActualizado,
+  });
+
+  final ModeloEntrega entrega;
+  final Map<String, dynamic> estudiante;
+  final ModeloTarea tarea;
+  final VoidCallback onActualizado;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorEstado = _obtenerColorEstado(entrega.estado);
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header con estudiante y estado
+            Row(
+              children: [
+                AvatarWidget(
+                  fotoUrl: estudiante['foto_perfil_url'] as String?,
+                  nombreCompleto: estudiante['nombre_completo'] as String? ?? 'Sin nombre',
+                  tipoUsuario: 'estudiante',
+                  radio: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        estudiante['nombre_completo'] as String? ?? 'Sin nombre',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        estudiante['codigo_estudiante'] as String? ?? 'Sin código',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: colorEstado.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    estadoEntregaToString(entrega.estado),
+                    style: TextStyle(
+                      color: colorEstado,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Información de entrega
+            Row(
+              children: [
+                Icon(LucideIcons.clock, size: 16, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Text(
+                  'Entregado: ${DateFormat.yMMMEd('es').add_jm().format(entrega.fechaEntrega)}',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+                const Spacer(),
+                if (entrega.calificacion != null) ...[
+                  Icon(LucideIcons.star, size: 16, color: Colors.amber.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${entrega.calificacion!.toStringAsFixed(1)}/${tarea.puntosMaximos.toInt()}',
+                    style: TextStyle(
+                      color: Colors.amber.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            
+            // Comentario del estudiante
+            if (entrega.comentarioEstudiante != null && entrega.comentarioEstudiante!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Comentario del estudiante:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      entrega.comentarioEstudiante!,
+                      style: TextStyle(color: Colors.blue.shade800),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
+            // Archivos adjuntos
+            if (entrega.archivosAdjuntos.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Archivos adjuntos (${entrega.totalArchivos}):',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: entrega.archivosAdjuntos.map((archivo) => 
+                  _ArchivoChip(archivo: archivo)
+                ).toList(),
+              ),
+            ],
+            
+            // Comentario del profesor
+            if (entrega.comentarioProfesor != null && entrega.comentarioProfesor!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Comentario del profesor:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      entrega.comentarioProfesor!,
+                      style: TextStyle(color: Colors.green.shade800),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
+            const SizedBox(height: 16),
+            
+            // Botones de acción
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _mostrarDialogoCalificacion(context, entrega, tarea, onActualizado),
+                  icon: const Icon(LucideIcons.pencil, size: 16),
+                  label: Text(entrega.calificacion != null ? 'Editar Calificación' : 'Calificar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _obtenerColorEstado(EstadoEntrega estado) {
+    switch (estado) {
+      case EstadoEntrega.entregado:
+        return Colors.green;
+      case EstadoEntrega.calificado:
+        return Colors.blue;
+      case EstadoEntrega.tarde:
+        return Colors.orange;
+      case EstadoEntrega.noEntregado:
+        return Colors.grey;
+    }
+  }
+}
+
+/// Chip para mostrar un archivo adjunto
+class _ArchivoChip extends StatelessWidget {
+  const _ArchivoChip({required this.archivo});
+  
+  final ArchivoAdjunto archivo;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _descargarArchivo(archivo.urlArchivo),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(archivo.icono, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    archivo.nombreOriginal,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    archivo.tamanoFormateado,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              LucideIcons.download,
+              size: 14,
+              color: Colors.grey.shade600,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _descargarArchivo(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        debugPrint('No se pudo abrir la URL: $url');
+      }
+    } catch (e) {
+      debugPrint('Error al descargar archivo: $e');
+    }
+  }
+}
+
+/// Muestra el diálogo para calificar una entrega
+void _mostrarDialogoCalificacion(
+  BuildContext context,
+  ModeloEntrega entrega,
+  ModeloTarea tarea,
+  VoidCallback onActualizado,
+) {
+  showDialog(
+    context: context,
+    builder: (context) => _DialogoCalificacion(
+      entrega: entrega,
+      tarea: tarea,
+      onActualizado: onActualizado,
+    ),
+  );
+}
+
+/// Diálogo para calificar una entrega
+class _DialogoCalificacion extends StatefulWidget {
+  const _DialogoCalificacion({
+    required this.entrega,
+    required this.tarea,
+    required this.onActualizado,
+  });
+
+  final ModeloEntrega entrega;
+  final ModeloTarea tarea;
+  final VoidCallback onActualizado;
+
+  @override
+  State<_DialogoCalificacion> createState() => _DialogoCalificacionState();
+}
+
+class _DialogoCalificacionState extends State<_DialogoCalificacion> {
+  late TextEditingController _calificacionController;
+  late TextEditingController _comentarioController;
+  bool _guardando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _calificacionController = TextEditingController(
+      text: widget.entrega.calificacion?.toString() ?? '',
+    );
+    _comentarioController = TextEditingController(
+      text: widget.entrega.comentarioProfesor ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _calificacionController.dispose();
+    _comentarioController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardarCalificacion() async {
+    final calificacion = double.tryParse(_calificacionController.text);
+    if (calificacion == null || calificacion < 0 || calificacion > widget.tarea.puntosMaximos) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ingrese una calificación válida (0 - ${widget.tarea.puntosMaximos.toInt()})'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _guardando = true);
+
+    try {
+      final repo = EntregaRepository();
+      await repo.calificarEntrega(
+        entregaId: widget.entrega.id,
+        calificacion: calificacion,
+        comentarioProfesor: _comentarioController.text.trim().isEmpty 
+          ? null 
+          : _comentarioController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onActualizado();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Calificación guardada exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar calificación: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _guardando = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Calificar Entrega'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextFormField(
+            controller: _calificacionController,
+            decoration: InputDecoration(
+              labelText: 'Calificación',
+              suffixText: '/ ${widget.tarea.puntosMaximos.toInt()}',
+              border: const OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _comentarioController,
+            decoration: const InputDecoration(
+              labelText: 'Comentario (opcional)',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _guardando ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _guardando ? null : _guardarCalificacion,
+          child: _guardando 
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text('Guardar'),
+        ),
+      ],
     );
   }
 } 

@@ -16,25 +16,19 @@ class ModeloPeriodoAcademico {
 
   factory ModeloPeriodoAcademico.fromJson(Map<String, dynamic> json) {
     return ModeloPeriodoAcademico(
-      id: json['id'] as String,
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
       nombre: json['nombre'] as String,
-      anio: json['anio'] as int,
-      semestre: json['semestre'] as int,
-      fechaInicio: DateTime.parse(json['fecha_inicio']),
-      fechaFin: DateTime.parse(json['fecha_fin']),
-      fechaMatriculaInicio: json['fecha_matricula_inicio'] != null
-          ? DateTime.parse(json['fecha_matricula_inicio'])
-          : null,
-      fechaMatriculaFin: json['fecha_matricula_fin'] != null
-          ? DateTime.parse(json['fecha_matricula_fin'])
-          : null,
+      anio: json['anio'] is int ? json['anio'] : int.tryParse(json['anio'].toString()) ?? 0,
+      semestre: json['semestre'] is int ? json['semestre'] : int.tryParse(json['semestre'].toString()) ?? 0,
+      fechaInicio: DateTime.parse(json['fecha_inicio'].toString()),
+      fechaFin: DateTime.parse(json['fecha_fin'].toString()),
+      fechaMatriculaInicio: json['fecha_matricula_inicio'] != null ? DateTime.tryParse(json['fecha_matricula_inicio'].toString()) : null,
+      fechaMatriculaFin: json['fecha_matricula_fin'] != null ? DateTime.tryParse(json['fecha_matricula_fin'].toString()) : null,
       estado: json['estado'] as String? ?? 'planificado',
-      fechaCreacion: json['fecha_creacion'] != null
-          ? DateTime.parse(json['fecha_creacion'])
-          : null,
+      fechaCreacion: json['fecha_creacion'] != null ? DateTime.tryParse(json['fecha_creacion'].toString()) : null,
     );
   }
-  final String id;
+  final int id;
   final String nombre;
   final int anio;
   final int semestre;

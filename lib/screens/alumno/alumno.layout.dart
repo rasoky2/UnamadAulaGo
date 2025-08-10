@@ -1,16 +1,22 @@
-import 'package:aulago/providers/alumno/cursos.alumno.riverpod.dart';
-import 'package:aulago/providers/alumno/home.alumno.riverpod.dart';
+// Eliminados providers antiguos de alumno; ahora usamos repos y estado local
 import 'package:aulago/providers/auth.riverpod.dart';
+import 'package:aulago/repositories/curso.repository.dart';
+import 'package:aulago/repositories/matricula.repository.dart';
+import 'package:aulago/models/curso.model.dart';
 import 'package:aulago/screens/alumno/cursos.alumno.screen.dart';
 import 'package:aulago/screens/alumno/home.alumno.screen.dart';
 import 'package:aulago/screens/alumno/widgets/perfil.alumno.widget.dart';
 import 'package:aulago/utils/constants.dart';
+import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:moony_nav_bar/moony_nav_bar.dart';
 
 final seccionAlumnoProvider = StateProvider<int>((ref) => 0);
+
+// Importamos los providers del sistema de cursos
+final cursoSeleccionadoAlumnoProvider = StateProvider<int?>((ref) => null);
 
 /// Widget de layout reutilizable que replica el diseño oficial de UNAMAD
 /// Incluye header superior, panel lateral de navegación y área de contenido
@@ -45,13 +51,21 @@ class UnamadLayout extends ConsumerWidget {
     final ancho = MediaQuery.of(context).size.width;
     final esMovil = ancho < 700;
     final seccion = ref.watch(seccionAlumnoProvider);
+    final cursoSeleccionado = ref.watch(cursoSeleccionadoAlumnoProvider);
+    
+    // Si está en la sección de cursos Y tiene un curso seleccionado, mostrar solo el layout del curso
+    if (seccion == 1 && cursoSeleccionado != null) {
+      return const PantallaCursosAlumno();
+    }
+    
     Widget contenido;
     switch (seccion) {
       case 0:
         contenido = const PantallaInicioAlumno();
         break;
       case 1:
-        contenido = const PantallaCursosAlumno();
+        // Mostrar selector de cursos dentro del layout principal
+        contenido = const _SelectorCursosWidget();
         break;
       case 2:
         contenido = const PerfilAlumnoWidget();
@@ -59,13 +73,14 @@ class UnamadLayout extends ConsumerWidget {
       default:
         contenido = const PantallaInicioAlumno();
     }
+    
     return ResponsiveScaffold(
       drawer: esMovil ? null : AlumnoSidebar(
         onSeccionSeleccionada: (i) => ref.read(seccionAlumnoProvider.notifier).state = i,
         seccionActual: seccion,
         estudiante: ref.read(proveedorAuthProvider).usuario,
-        periodosAsync: ref.watch(periodosAcademicosProvider),
-        periodoSeleccionado: ref.read(periodoSeleccionadoProvider),
+        periodosAsync: const AsyncValue.data([]),
+        periodoSeleccionado: null,
         ref: ref,
       ),
       mobileBody: contenido,
@@ -75,8 +90,8 @@ class UnamadLayout extends ConsumerWidget {
             onSeccionSeleccionada: (i) => ref.read(seccionAlumnoProvider.notifier).state = i,
             seccionActual: seccion,
             estudiante: ref.read(proveedorAuthProvider).usuario,
-            periodosAsync: ref.watch(periodosAcademicosProvider),
-            periodoSeleccionado: ref.read(periodoSeleccionadoProvider),
+            periodosAsync: const AsyncValue.data([]),
+            periodoSeleccionado: null,
             ref: ref,
           ),
           Expanded(child: contenido),
@@ -288,6 +303,7 @@ class ResponsiveScaffold extends StatelessWidget {
     final ancho = MediaQuery.of(context).size.width;
     final esMovil = ancho < 700;
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: appBar,
       drawer: esMovil ? drawer : null,
       body: esMovil ? mobileBody : desktopBody,
@@ -318,8 +334,8 @@ class AlumnoSidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ancho = MediaQuery.of(context).size.width;
     final esMovil = ancho < 700;
-    final cursosAsync = ref.watch(cursosAlumnoProvider);
-    final cursoSeleccionadoId = ref.watch(cursoAlumnoStateProvider).cursoSeleccionadoId;
+    final codigo = ref.watch(codigoUsuarioProvider);
+    final int? cursoSeleccionadoId = ref.watch(cursoSeleccionadoAlumnoProvider);
     return Drawer(
       child: Column(
         children: [
@@ -374,25 +390,46 @@ class AlumnoSidebar extends ConsumerWidget {
                     color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        estudiante?.nombreCompleto ?? '',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      // Avatar del estudiante
+                      AvatarWidget(
+                        fotoUrl: estudiante?.fotoPerfilUrl,
+                        nombreCompleto: estudiante?.nombreCompleto ?? '',
                       ),
-                      const SizedBox(height: 2),
-                      if (estudiante.toJson().containsKey('codigoEstudiante'))
-                        Text('Código: 24${estudiante.toJson()['codigoEstudiante']}'),
-                      Text(
-                        'Alumnos',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 12,
+                      const SizedBox(width: 12),
+                      // Información del estudiante
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              estudiante?.nombreCompleto ?? '',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            if (estudiante?.toJson().containsKey('codigoEstudiante') == true)
+                              Text(
+                                'Código: 24${estudiante.toJson()['codigoEstudiante']}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            Text(
+                              'Estudiante',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -413,32 +450,47 @@ class AlumnoSidebar extends ConsumerWidget {
                     title: Text('Cursos', style: TextStyle(fontWeight: seccionActual == 1 ? FontWeight.w600 : FontWeight.normal, color: seccionActual == 1 ? AppConstants.primaryColor : AppConstants.textSecondary)),
                     initiallyExpanded: seccionActual == 1,
                     children: [
-                      cursosAsync.when(
-                        data: (cursos) => Column(
-                          children: cursos.map((curso) => ListTile(
-                            dense: true,
-                            contentPadding: const EdgeInsets.only(left: 36, right: 8),
-                            title: Text(
-                              curso.curso.nombre,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: cursoSeleccionadoId == curso.curso.id ? AppConstants.primaryColor : AppConstants.textSecondary,
-                                fontWeight: cursoSeleccionadoId == curso.curso.id ? FontWeight.bold : FontWeight.normal,
+                      FutureBuilder<List<ModeloCursoDetallado>>(
+                        future: MatriculaRepository().obtenerCursosMatriculadosPorCodigo(codigo),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: LinearProgressIndicator(),
+                            );
+                          }
+                          if (snapshot.hasError) {
+                            return const ListTile(
+                              title: Text('Error al cargar cursos', style: TextStyle(color: Colors.red)),
+                            );
+                          }
+                          final cursos = snapshot.data ?? const <ModeloCursoDetallado>[];
+                          if (cursos.isEmpty) {
+                            return const ListTile(
+                              title: Text('No hay cursos matriculados'),
+                            );
+                          }
+                          return Column(
+                            children: cursos.map((curso) => ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.only(left: 36, right: 8),
+                              title: Text(
+                                curso.curso.nombre,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: cursoSeleccionadoId == curso.curso.id ? AppConstants.primaryColor : AppConstants.textSecondary,
+                                  fontWeight: cursoSeleccionadoId == curso.curso.id ? FontWeight.bold : FontWeight.normal,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onTap: () {
-                              ref.read(seccionAlumnoProvider.notifier).state = 1;
-                              ref.read(cursoAlumnoStateProvider.notifier).seleccionarCurso(curso.curso.id);
-                            },
-                            selected: cursoSeleccionadoId == curso.curso.id,
-                          )).toList(),
-                        ),
-                        loading: () => const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: LinearProgressIndicator(),
-                        ),
-                        error: (e, s) => const ListTile(title: Text('Error al cargar cursos', style: TextStyle(color: Colors.red))),
+                              onTap: () {
+                                ref.read(cursoSeleccionadoAlumnoProvider.notifier).state = curso.curso.id;
+                                ref.read(seccionAlumnoProvider.notifier).state = 1;
+                              },
+                              selected: cursoSeleccionadoId == curso.curso.id,
+                            )).toList(),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -553,4 +605,302 @@ class AlumnoSidebar extends ConsumerWidget {
     ..add(ObjectFlagProperty<void Function(int p1)>.has('onSeccionSeleccionada', onSeccionSeleccionada))
     ..add(IntProperty('seccionActual', seccionActual));
   }
-} 
+}
+
+// Widget para mostrar el selector de cursos dentro del layout principal
+class _SelectorCursosWidget extends ConsumerStatefulWidget {
+  const _SelectorCursosWidget();
+
+  @override
+  ConsumerState<_SelectorCursosWidget> createState() => _SelectorCursosWidgetState();
+}
+
+class _SelectorCursosWidgetState extends ConsumerState<_SelectorCursosWidget> {
+  final CursoRepository _repo = CursoRepository();
+  late Future<List<dynamic>> _cursosFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // Usar el mismo repositorio que en PantallaCursosAlumno
+    _cursosFuture = _repo.obtenerCursosConProfesor();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ancho = MediaQuery.of(context).size.width;
+    final esMovil = ancho < 700;
+
+    return Container(
+      padding: EdgeInsets.all(esMovil ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Mis Cursos',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: AppConstants.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Selecciona un curso para acceder a sus herramientas',
+            style: TextStyle(
+              fontSize: 16,
+              color: AppConstants.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 32),
+          Expanded(
+            child: FutureBuilder<List<dynamic>>(
+              future: _cursosFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                
+                final cursosDetallados = snapshot.data ?? [];
+                
+                if (cursosDetallados.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.book_outlined,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No tienes cursos disponibles',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
+                if (esMovil) {
+                  return ListView.builder(
+                    itemCount: cursosDetallados.length,
+                    itemBuilder: (context, index) {
+                      final cursoDetallado = cursosDetallados[index];
+                      return _construirTarjetaCursoMovil(cursoDetallado);
+                    },
+                  );
+                } else {
+                  return GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 1.5,
+                      crossAxisSpacing: 20,
+                      mainAxisSpacing: 20,
+                    ),
+                    itemCount: cursosDetallados.length,
+                    itemBuilder: (context, index) {
+                      final cursoDetallado = cursosDetallados[index];
+                      return _construirTarjetaCursoDesktop(cursoDetallado);
+                    },
+                  );
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _construirTarjetaCursoMovil(dynamic cursoDetallado) {
+    final curso = cursoDetallado.curso;
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () {
+          // Seleccionar el curso - esto activará el layout completo de cursos
+          ref.read(cursoSeleccionadoAlumnoProvider.notifier).state = curso.id;
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.school,
+                  color: AppConstants.primaryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      curso.nombre,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Profesor: ${cursoDetallado.profesor?.nombreCompleto ?? 'No asignado'}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    if (curso.codigoCurso.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          curso.codigoCurso,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppConstants.primaryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: AppConstants.primaryColor,
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _construirTarjetaCursoDesktop(dynamic cursoDetallado) {
+    final curso = cursoDetallado.curso;
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: () {
+          // Seleccionar el curso - esto activará el layout completo de cursos
+          ref.read(cursoSeleccionadoAlumnoProvider.notifier).state = curso.id;
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppConstants.primaryColor.withValues(alpha: 0.1),
+                AppConstants.primaryColor.withValues(alpha: 0.05),
+              ],
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppConstants.primaryColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.school,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(
+                    Icons.arrow_forward,
+                    color: AppConstants.primaryColor,
+                    size: 20,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    curso.nombre,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppConstants.textPrimary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Profesor: ${cursoDetallado.profesor?.nombreCompleto ?? 'No asignado'}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (curso.codigoCurso.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppConstants.primaryColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        curso.codigoCurso,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppConstants.primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

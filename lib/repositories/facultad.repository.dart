@@ -1,7 +1,5 @@
 import 'package:aulago/repositories/base.repository.dart';
-import 'package:aulago/utils/logger.dart';
 
-/// Repositorio para gestión de facultades
 class FacultadRepository extends BaseRepository<Map<String, dynamic>> {
   @override
   String get tableName => 'facultades';
@@ -18,34 +16,32 @@ class FacultadRepository extends BaseRepository<Map<String, dynamic>> {
   Map<String, dynamic> toJson(Map<String, dynamic> entity) {
     return entity;
   }
-  
+
   @override
   String getId(Map<String, dynamic> entity) {
-    return entity['id'] as String;
+    return entity['id'].toString();
   }
 
-  /// Obtener facultades para dropdown
-  Future<List<Map<String, dynamic>>> obtenerFacultadesDropdown() async {
-    try {
-      final respuesta = await supabase
-          .from('facultades')
-          .select()
-          .order('nombre');
+  // CRUD básico
+  Future<List<Map<String, dynamic>>> obtenerFacultades() async {
+    final result = await obtener(limite: 1000, offset: 0);
+    return result.items;
+  }
 
-      ApiLogger.logGet(
-        table: 'facultades',
-        statusCode: 200,
-        response: respuesta,
-      );
+  Future<Map<String, dynamic>?> obtenerFacultadPorId(int id) async {
+    return obtenerPorId(id.toString());
+  }
 
-      return List<Map<String, dynamic>>.from(respuesta);
-    } catch (e) {
-      ApiLogger.logError(
-        operation: 'GET',
-        table: 'facultades',
-        error: e,
-      );
-      rethrow;
-    }
+  Future<Map<String, dynamic>> crearFacultad(Map<String, dynamic> facultad) async {
+    return crear(facultad);
+  }
+
+  Future<Map<String, dynamic>> actualizarFacultad(int id, Map<String, dynamic> facultad) async {
+    return actualizar(id.toString(), facultad);
+  }
+
+  Future<bool> eliminarFacultad(int id) async {
+    await eliminar(id.toString());
+    return true;
   }
 } 

@@ -1,800 +1,174 @@
+import 'package:aulago/models/carrera.model.dart';
 import 'package:aulago/models/estudiante.model.dart';
-import 'package:aulago/providers/admin/estudiantes.admin.riverpod.dart';
+import 'package:aulago/repositories/carrera.repository.dart';
+import 'package:aulago/repositories/estudiante.repository.dart';
 import 'package:aulago/utils/constants.dart';
-
+import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:responsive_framework/responsive_framework.dart';
 
-// Pantalla principal que retorna directamente el contenido
+final estudiantesProvider = StateNotifierProvider<_EstudiantesNotifier, List<EstudianteAdmin>>((ref) {
+  return _EstudiantesNotifier();
+});
+
+class _EstudiantesNotifier extends StateNotifier<List<EstudianteAdmin>> {
+  _EstudiantesNotifier() : super([]) {
+    cargarEstudiantes();
+  }
+  final _repo = EstudianteRepository();
+  Future<void> cargarEstudiantes() async {
+    final lista = await _repo.obtenerEstudiantes();
+    state = lista;
+  }
+  Future<bool> crearEstudiante(EstudianteAdmin estudiante) async {
+    try {
+      await _repo.crearEstudiante(estudiante);
+      await cargarEstudiantes();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+  Future<bool> actualizarEstudiante(int id, EstudianteAdmin estudiante) async {
+    try {
+      await _repo.actualizarEstudiante(id, estudiante);
+      await cargarEstudiantes();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+  Future<bool> eliminarEstudiante(int id) async {
+    try {
+      await _repo.eliminarEstudiante(id);
+      await cargarEstudiantes();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
 class PantallaEstudiantesAdmin extends ConsumerStatefulWidget {
   const PantallaEstudiantesAdmin({super.key});
-
   @override
   ConsumerState<PantallaEstudiantesAdmin> createState() => _PantallaEstudiantesAdminState();
 }
 
 class _PantallaEstudiantesAdminState extends ConsumerState<PantallaEstudiantesAdmin> {
   final TextEditingController _searchController = TextEditingController();
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(estudiantesAdminProvider);
-
+    final estudiantes = ref.watch(estudiantesProvider);
+    final filtro = _searchController.text.trim().toLowerCase();
+    final listaFiltrada = filtro.isEmpty
+        ? estudiantes
+        : estudiantes.where((e) => e.nombreCompleto.toLowerCase().contains(filtro) || e.codigoEstudiante.toLowerCase().contains(filtro)).toList();
     return Column(
       children: [
-        // Header y controles
         _construirHeader(),
-        
         const SizedBox(height: AppConstants.defaultPadding),
-        
-        // Filtros
-        _construirFiltros(),
-        
+        _construirBarraBusqueda(),
         const SizedBox(height: AppConstants.defaultPadding),
-        
-        // Contenido principal
-        Expanded(
-          child: _construirContenido(state),
-        ),
+        Expanded(child: _construirContenido(listaFiltrada)),
       ],
     );
   }
-
   Widget _construirHeader() {
-    final breakpoints = ResponsiveBreakpoints.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-    
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: _construirHeaderResponsive(breakpoints, screenWidth),
-    );
-  }
-
-  Widget _construirHeaderResponsive(ResponsiveBreakpointsData breakpoints, double screenWidth) {
-    if (breakpoints.isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          const Text(
-            'Gestión de Estudiantes',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppConstants.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _mostrarDialogoEstudiante(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Nuevo Estudiante'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primaryColor,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () => ref.read(estudiantesAdminProvider.notifier).cargarEstudiantes(refrescar: true),
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Refrescar',
-              ),
-            ],
-          ),
-        ],
-      );
-    } else if (breakpoints.isTablet || screenWidth < 1000) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Gestión de Estudiantes',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppConstants.textPrimary,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: () => ref.read(estudiantesAdminProvider.notifier).cargarEstudiantes(refrescar: true),
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Refrescar',
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: 200,
-            child: ElevatedButton.icon(
-              onPressed: () => _mostrarDialogoEstudiante(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Nuevo Estudiante'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primaryColor,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      );
-    } else {
-      return Row(
-        children: [
-          // Título
-          const Text(
-            'Gestión de Estudiantes',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppConstants.textPrimary,
-            ),
-          ),
-          
+          const Text('Gestión de Estudiantes', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const Spacer(),
-          
-          // Botón refrescar
           IconButton(
-            onPressed: () => ref.read(estudiantesAdminProvider.notifier).cargarEstudiantes(refrescar: true),
+            onPressed: () => ref.read(estudiantesProvider.notifier).cargarEstudiantes(),
             icon: const Icon(Icons.refresh),
             tooltip: 'Refrescar',
           ),
-          
           const SizedBox(width: 8),
-          
-          // Botón nuevo estudiante
           ElevatedButton.icon(
             onPressed: () => _mostrarDialogoEstudiante(context),
             icon: const Icon(Icons.add),
             label: const Text('Nuevo Estudiante'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryColor,
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
           ),
-        ],
-      );
-    }
-  }
-
-  Widget _construirFiltros() {
-    final state = ref.watch(estudiantesAdminProvider);
-    final breakpoints = ResponsiveBreakpoints.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    return Container(
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Filtros',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppConstants.textPrimary,
-            ),
-          ),
-          
-          const SizedBox(height: AppConstants.defaultPadding),
-          
-          if (breakpoints.isMobile) ...[
-            // Vista móvil - filtros apilados
-            Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    labelText: 'Buscar estudiantes...',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onChanged: (value) {
-                    ref.read(estudiantesAdminProvider.notifier).aplicarFiltroTexto(value);
-                  },
-                ),
-                
-                const SizedBox(height: 12),
-                
-                DropdownButtonFormField<FiltroEstadoEstudiante>(
-                  initialValue: state.filtroEstado,
-                  decoration: const InputDecoration(
-                    labelText: 'Estado',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: FiltroEstadoEstudiante.values.map((estado) {
-                    return DropdownMenuItem(
-                      value: estado,
-                      child: Text(_obtenerTextoEstado(estado)),
-                    );
-                  }).toList(),
-                  onChanged: (valor) {
-                    if (valor != null) {
-                      ref.read(estudiantesAdminProvider.notifier).aplicarFiltroEstado(valor);
-                    }
-                  },
-                ),
-                
-                const SizedBox(height: 12),
-                
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      _searchController.clear();
-                      ref.read(estudiantesAdminProvider.notifier).limpiarFiltros();
-                    },
-                    icon: const Icon(Icons.clear),
-                    label: const Text('Limpiar filtros'),
-                  ),
-                ),
-              ],
-            ),
-          ] else if (breakpoints.isTablet || screenWidth < 1000) ...[
-            // Vista tablet - filtros en 2 columnas
-            Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          labelText: 'Buscar estudiantes...',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        onChanged: (value) {
-                          ref.read(estudiantesAdminProvider.notifier).aplicarFiltroTexto(value);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    SizedBox(
-                      width: 150,
-                      child: DropdownButtonFormField<FiltroEstadoEstudiante>(
-                        initialValue: state.filtroEstado,
-                        decoration: const InputDecoration(
-                          labelText: 'Estado',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: FiltroEstadoEstudiante.values.map((estado) {
-                          return DropdownMenuItem(
-                            value: estado,
-                            child: Text(_obtenerTextoEstado(estado)),
-                          );
-                        }).toList(),
-                        onChanged: (valor) {
-                          if (valor != null) {
-                            ref.read(estudiantesAdminProvider.notifier).aplicarFiltroEstado(valor);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () {
-                      _searchController.clear();
-                      ref.read(estudiantesAdminProvider.notifier).limpiarFiltros();
-                    },
-                    icon: const Icon(Icons.clear),
-                    label: const Text('Limpiar filtros'),
-                  ),
-                ),
-              ],
-            ),
-          ] else ...[
-            // Vista desktop - filtros en línea
-            Wrap(
-              spacing: 16,
-              runSpacing: 12,
-              children: [
-                // Búsqueda
-                SizedBox(
-                  width: 300,
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Buscar estudiantes...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: (value) {
-                      ref.read(estudiantesAdminProvider.notifier).aplicarFiltroTexto(value);
-                    },
-                  ),
-                ),
-                
-                // Filtro por estado
-                SizedBox(
-                  width: 200,
-                  child: DropdownButtonFormField<FiltroEstadoEstudiante>(
-                    initialValue: state.filtroEstado,
-                    decoration: const InputDecoration(
-                      labelText: 'Estado',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    items: FiltroEstadoEstudiante.values.map((estado) {
-                      return DropdownMenuItem(
-                        value: estado,
-                        child: Text(_obtenerTextoEstado(estado)),
-                      );
-                    }).toList(),
-                    onChanged: (valor) {
-                      if (valor != null) {
-                        ref.read(estudiantesAdminProvider.notifier).aplicarFiltroEstado(valor);
-                      }
-                    },
-                  ),
-                ),
-                
-                // Botón limpiar filtros
-                TextButton.icon(
-                  onPressed: () {
-                    _searchController.clear();
-                    ref.read(estudiantesAdminProvider.notifier).limpiarFiltros();
-                  },
-                  icon: const Icon(Icons.clear),
-                  label: const Text('Limpiar filtros'),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
-
-  Widget _construirContenido(EstudiantesAdminData state) {
-    if (state.cargando) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (state.error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 64, color: AppConstants.errorColor),
-            const SizedBox(height: 16),
-            Text(
-              state.error!,
-              style: const TextStyle(color: AppConstants.errorColor),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.read(estudiantesAdminProvider.notifier).cargarEstudiantes(refrescar: true),
-              child: const Text('Reintentar'),
-            ),
-          ],
+  Widget _construirBarraBusqueda() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppConstants.defaultPadding),
+      child: TextField(
+        controller: _searchController,
+        decoration: const InputDecoration(
+          labelText: 'Buscar estudiantes...',
+          prefixIcon: Icon(Icons.search),
+          border: OutlineInputBorder(),
+          isDense: true,
         ),
-      );
-    }
-
-    if (state.estudiantes.isEmpty) {
-      return _construirEstadoVacio();
-    }
-
-    return _construirListaEstudiantes(state.estudiantes);
-  }
-
-  Widget _construirEstadoVacio() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.people_outline, size: 64, color: AppConstants.textTertiary),
-          SizedBox(height: 16),
-          Text(
-            'No se encontraron estudiantes',
-            style: TextStyle(
-              fontSize: 18,
-              color: AppConstants.textSecondary,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Ajusta los filtros o crea el primer estudiante',
-            style: TextStyle(
-              color: AppConstants.textTertiary,
-            ),
-          ),
-        ],
+        onChanged: (_) => setState(() {}),
       ),
     );
   }
-
-  Widget _construirListaEstudiantes(List<EstudianteAdmin> estudiantes) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        ref.read(estudiantesAdminProvider.notifier).cargarEstudiantes(refrescar: true);
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: estudiantes.length,
-        itemBuilder: (context, index) {
-          final estudiante = estudiantes[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _construirCardEstudiante(estudiante),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _construirCardEstudiante(EstudianteAdmin estudiante) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Icono de estado
-            Column(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: estudiante.activo 
-                        ? AppConstants.primaryColor.withValues(alpha: 0.1)
-                        : Colors.grey.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    color: estudiante.activo 
-                        ? AppConstants.primaryColor 
-                        : Colors.grey,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: estudiante.activo 
-                        ? Colors.green 
-                        : Colors.red,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    estudiante.activo ? 'ACTIVO' : 'INACTIVO',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
+  Widget _construirContenido(List<EstudianteAdmin> estudiantes) {
+    if (estudiantes.isEmpty) {
+      return const Center(child: Text('No se encontraron estudiantes'));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: estudiantes.length,
+      itemBuilder: (context, index) {
+        final estudiante = estudiantes[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: AvatarWidget(
+              fotoUrl: estudiante.fotoPerfilUrl,
+              nombreCompleto: estudiante.nombreCompleto,
+              tipoUsuario: 'estudiante',
+              radio: 18,
+              mostrarBordeOnline: estudiante.activo,
             ),
-            const SizedBox(width: 16),
-            // Información principal
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    estudiante.nombreCompleto,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppConstants.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    estudiante.codigoEstudiante,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppConstants.textSecondary,
-                    ),
-                  ),
-                  if (estudiante.carreraNombre != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      estudiante.carreraNombre!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppConstants.textSecondary,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.email,
-                        size: 14,
-                        color: AppConstants.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          estudiante.correoElectronico ?? 'N/A',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppConstants.textSecondary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (estudiante.telefono != null) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.phone,
-                          size: 14,
-                          color: AppConstants.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          estudiante.telefono!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppConstants.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Botones de acción
-            Column(
+            title: Text(estudiante.nombreCompleto),
+            subtitle: Text(estudiante.codigoEstudiante),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(
-                    Icons.visibility,
-                    color: AppConstants.primaryColor,
-                  ),
-                  tooltip: 'Ver detalles',
-                  onPressed: () => _mostrarDetallesEstudiante(context, estudiante),
-                ),
-                const SizedBox(height: 4),
-                IconButton(
-                  icon: const Icon(
-                    Icons.edit,
-                    color: Colors.blue,
-                  ),
-                  tooltip: 'Editar',
+                  icon: const Icon(Icons.edit, color: Colors.blue),
                   onPressed: () => _mostrarDialogoEstudiante(context, estudiante),
                 ),
-                const SizedBox(height: 4),
                 IconButton(
-                  icon: Icon(
-                    estudiante.activo ? Icons.toggle_on : Icons.toggle_off,
-                    color: estudiante.activo ? Colors.green : Colors.red,
-                  ),
-                  tooltip: estudiante.activo ? 'Desactivar' : 'Activar',
-                  onPressed: () => _confirmarCambioEstado(context, estudiante),
-                ),
-                const SizedBox(height: 4),
-                IconButton(
-                  icon: const Icon(
-                    Icons.delete,
-                    color: Colors.red,
-                  ),
-                  tooltip: 'Eliminar',
+                  icon: const Icon(Icons.delete, color: Colors.red),
                   onPressed: () => _confirmarEliminar(context, estudiante),
                 ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
-
-
-
-
-
-  String _obtenerTextoEstado(FiltroEstadoEstudiante estado) {
-    switch (estado) {
-      case FiltroEstadoEstudiante.todos:
-        return 'Todos';
-      case FiltroEstadoEstudiante.activos:
-        return 'Activos';
-      case FiltroEstadoEstudiante.inactivos:
-        return 'Inactivos';
-    }
-  }
-
   void _mostrarDialogoEstudiante(BuildContext context, [EstudianteAdmin? estudiante]) {
     showDialog(
       context: context,
       builder: (context) => _DialogoEstudiante(estudiante: estudiante),
     );
   }
-
-  void _mostrarDetallesEstudiante(BuildContext context, EstudianteAdmin estudiante) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Detalles de ${estudiante.nombreCompleto}'),
-        content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DetalleItem(
-                icon: Icons.badge,
-                label: 'Código',
-                value: estudiante.codigoEstudiante,
-              ),
-              const SizedBox(height: 12),
-              _DetalleItem(
-                icon: Icons.person,
-                label: 'Nombre',
-                value: estudiante.nombreCompleto,
-              ),
-              if (estudiante.carreraNombre != null) ...[
-                const SizedBox(height: 12),
-                _DetalleItem(
-                  icon: Icons.school,
-                  label: 'Carrera',
-                  value: estudiante.carreraNombre!,
-                ),
-              ],
-              const SizedBox(height: 12),
-              _DetalleItem(
-                icon: Icons.email,
-                label: 'Email',
-                value: estudiante.correoElectronico ?? 'N/A',
-              ),
-              if (estudiante.telefono != null) ...[
-                const SizedBox(height: 12),
-                _DetalleItem(
-                  icon: Icons.phone,
-                  label: 'Teléfono',
-                  value: estudiante.telefono!,
-                ),
-              ],
-              const SizedBox(height: 12),
-              _DetalleItem(
-                icon: Icons.circle,
-                label: 'Estado',
-                value: estudiante.activo ? 'Activo' : 'Inactivo',
-                color: estudiante.activo ? Colors.green : Colors.red,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmarCambioEstado(BuildContext context, EstudianteAdmin estudiante) {
-    final nuevoEstado = !estudiante.activo;
-    final accion = nuevoEstado ? 'activar' : 'desactivar';
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Confirmar $accion'),
-        content: Text(
-          '¿Estás seguro de que deseas $accion al estudiante '
-          '${estudiante.nombreCompleto}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(dialogContext).pop();
-              final success = await ref
-                  .read(estudiantesAdminProvider.notifier)
-                  .cambiarEstadoEstudiante(estudiante.id, activo: nuevoEstado);
-              
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      success
-                          ? 'Estudiante ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente'
-                          : 'Error al cambiar estado del estudiante',
-                    ),
-                    backgroundColor: success ? Colors.green : Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: nuevoEstado ? Colors.green : Colors.red,
-            ),
-            child: Text(accion.toUpperCase()),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _confirmarEliminar(BuildContext context, EstudianteAdmin estudiante) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Confirmar eliminación'),
-        content: Text(
-          '¿Estás seguro de que deseas eliminar al estudiante '
-          '${estudiante.nombreCompleto}?\n\n'
-          'Esta acción no se puede deshacer.',
-        ),
+        content: Text('¿Estás seguro de que deseas eliminar a ${estudiante.nombreCompleto}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -803,22 +177,16 @@ class _PantallaEstudiantesAdminState extends ConsumerState<PantallaEstudiantesAd
           ElevatedButton(
             onPressed: () async {
               Navigator.of(dialogContext).pop();
-              final success = await ref
-                  .read(estudiantesAdminProvider.notifier)
-                  .eliminarEstudiante(estudiante.id);
-              
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      success
-                          ? 'Estudiante eliminado exitosamente'
-                          : 'Error al eliminar estudiante',
-                    ),
-                    backgroundColor: success ? Colors.green : Colors.red,
-                  ),
-                );
+              final success = await ref.read(estudiantesProvider.notifier).eliminarEstudiante(estudiante.id);
+              if (!mounted) {
+                return;
               }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(success ? 'Estudiante eliminado exitosamente' : 'Error al eliminar estudiante'),
+                  backgroundColor: success ? Colors.green : Colors.red,
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('ELIMINAR', style: TextStyle(color: Colors.white)),
@@ -829,12 +197,9 @@ class _PantallaEstudiantesAdminState extends ConsumerState<PantallaEstudiantesAd
   }
 }
 
-// Diálogo para crear/editar estudiante
 class _DialogoEstudiante extends ConsumerStatefulWidget {
-
   const _DialogoEstudiante({this.estudiante});
   final EstudianteAdmin? estudiante;
-
   @override
   ConsumerState<_DialogoEstudiante> createState() => _DialogoEstudianteState();
 
@@ -844,211 +209,203 @@ class _DialogoEstudiante extends ConsumerStatefulWidget {
     properties.add(DiagnosticsProperty<EstudianteAdmin?>('estudiante', estudiante));
   }
 }
-
 class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nombresController;
-  late final TextEditingController _apellidosController;
+  late final TextEditingController _nombreController;
+  late final TextEditingController _codigoController;
   late final TextEditingController _emailController;
   late final TextEditingController _telefonoController;
-  late final TextEditingController _codigoController;
   late final TextEditingController _semestreController;
-  
-  String? _carreraSeleccionada;
-  
+  late final TextEditingController _direccionController;
+  DateTime? _fechaNacimiento;
+  bool _activo = true;
+  int? _carreraSeleccionadaId;
+  List<ModeloCarrera> _carreras = const [];
+  final _carreraRepo = CarreraRepository();
+  final _estRepo = EstudianteRepository();
+  final TextEditingController _nuevaContrasenaController = TextEditingController();
+  final TextEditingController _contrasenaAlCrearController = TextEditingController();
   @override
   void initState() {
     super.initState();
-    
-    // Separar nombre completo en nombres y apellidos si existe el estudiante
-    String nombres = '';
-    String apellidos = '';
-    
-    if (widget.estudiante != null) {
-      final nombresSeparados = widget.estudiante!.nombreCompleto.split(' ');
-      if (nombresSeparados.isNotEmpty) {
-        nombres = nombresSeparados.first;
-        if (nombresSeparados.length > 1) {
-          apellidos = nombresSeparados.skip(1).join(' ');
-        }
-      }
-      _carreraSeleccionada = widget.estudiante!.carreraId;
-    }
-    
-    _nombresController = TextEditingController(text: nombres);
-    _apellidosController = TextEditingController(text: apellidos);
+    _nombreController = TextEditingController(text: widget.estudiante?.nombreCompleto ?? '');
+    _codigoController = TextEditingController(text: widget.estudiante?.codigoEstudiante ?? '');
     _emailController = TextEditingController(text: widget.estudiante?.correoElectronico ?? '');
     _telefonoController = TextEditingController(text: widget.estudiante?.telefono ?? '');
-    _codigoController = TextEditingController(text: widget.estudiante?.codigoEstudiante ?? '');
-    _semestreController = TextEditingController(text: widget.estudiante?.semestreActual?.toString() ?? '1');
+    _semestreController = TextEditingController(text: widget.estudiante?.semestreActual?.toString() ?? '');
+    _direccionController = TextEditingController(text: widget.estudiante?.direccion ?? '');
+    _fechaNacimiento = widget.estudiante?.fechaNacimiento;
+    _activo = widget.estudiante?.activo ?? true;
+    _carreraSeleccionadaId = widget.estudiante?.carreraId;
+    _cargarCarreras();
   }
-
   @override
   void dispose() {
-    _nombresController.dispose();
-    _apellidosController.dispose();
+    _nombreController.dispose();
+    _codigoController.dispose();
     _emailController.dispose();
     _telefonoController.dispose();
-    _codigoController.dispose();
     _semestreController.dispose();
+    _direccionController.dispose();
+    _nuevaContrasenaController.dispose();
+    _contrasenaAlCrearController.dispose();
     super.dispose();
   }
 
+  Future<void> _cargarCarreras() async {
+    final lista = await _carreraRepo.obtenerCarreras();
+    if (mounted) {
+      setState(() => _carreras = lista);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final esEdicion = widget.estudiante != null;
-
     return AlertDialog(
       title: Text(esEdicion ? 'Editar Estudiante' : 'Nuevo Estudiante'),
       content: SizedBox(
         width: 400,
         child: Form(
           key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                controller: _codigoController,
-                decoration: const InputDecoration(
-                  labelText: 'Código de Estudiante *',
-                  border: OutlineInputBorder(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (esEdicion) ...[
+                Align(
+                  alignment: Alignment.center,
+                  child: AvatarWidget(
+                    fotoUrl: widget.estudiante?.fotoPerfilUrl,
+                    nombreCompleto: widget.estudiante?.nombreCompleto ?? 'Estudiante',
+                    tipoUsuario: 'estudiante',
+                    radio: 36,
+                    mostrarBordeOnline: _activo,
+                  ),
                 ),
+                const SizedBox(height: 16),
+              ],
+              TextFormField(
+                controller: _nombreController,
+                decoration: const InputDecoration(labelText: 'Nombre Completo *', border: OutlineInputBorder()),
+                validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _codigoController,
+                decoration: const InputDecoration(labelText: 'Código de Estudiante *', border: OutlineInputBorder()),
+                validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
+              ),
+              const SizedBox(height: 16),
+              // Contraseña en creación
+              if (!esEdicion) ...[
+                TextFormField(
+                  controller: _contrasenaAlCrearController,
+                  decoration: const InputDecoration(labelText: 'Contraseña *', border: OutlineInputBorder()),
+                  obscureText: true,
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Campo requerido' : null,
+                ),
+                const SizedBox(height: 16),
+              ],
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email *', border: OutlineInputBorder()),
+                keyboardType: TextInputType.emailAddress,
                 validator: (value) {
-                  if (value?.isEmpty == true) {
+                  if (value == null || value.isEmpty) {
                     return 'Campo requerido';
+                  }
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}').hasMatch(value)) {
+                    return 'Email inválido';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
               TextFormField(
-                controller: _nombresController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombres *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value?.isEmpty == true) {
-                    return 'Campo requerido';
-                  }
-                  return null;
-                },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                controller: _apellidosController,
-                decoration: const InputDecoration(
-                  labelText: 'Apellidos *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value?.isEmpty == true) {
-                    return 'Campo requerido';
-                  }
-                  return null;
-                },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email *',
-                  border: OutlineInputBorder(),
-                ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value?.isEmpty == true) {
-                      return 'Campo requerido';
-                    }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
-                    return 'Email inválido';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
                 controller: _telefonoController,
-                decoration: const InputDecoration(
-                  labelText: 'Teléfono',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'Teléfono', border: OutlineInputBorder()),
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 16),
-              // Dropdown para seleccionar carrera
-              Consumer(
-                builder: (context, ref, child) {
-                  final carreras = ref.watch(carrerasDisponiblesProvider);
-                  
-                  return carreras.when(
-                    data: (listaCarreras) => DropdownButtonFormField<String>(
-                      initialValue: _carreraSeleccionada,
-                      decoration: const InputDecoration(
-                        labelText: 'Carrera *',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          child: Text('Seleccionar carrera'),
-                        ),
-                        ...listaCarreras.map((carrera) => DropdownMenuItem<String>(
-                          value: carrera.id,
-                          child: Text(carrera.nombre),
-                        )),
-                      ],
-                      onChanged: (valor) {
-                        setState(() {
-                          _carreraSeleccionada = valor;
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Debe seleccionar una carrera';
-                        }
-                        return null;
-                      },
-                    ),
-                    loading: () => DropdownButtonFormField<String>(
-                      items: const [],
-                      onChanged: null,
-                      decoration: const InputDecoration(
-                        labelText: 'Cargando carreras...',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    error: (error, stack) => DropdownButtonFormField<String>(
-                      items: const [],
-                      onChanged: null,
-                      decoration: const InputDecoration(
-                        labelText: 'Error al cargar carreras',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                  );
-                },
+              DropdownButtonFormField<int>(
+                value: _carreraSeleccionadaId,
+                decoration: const InputDecoration(labelText: 'Carrera *', border: OutlineInputBorder()),
+                items: _carreras
+                    .map((c) => DropdownMenuItem<int>(
+                          value: c.id,
+                          child: Text(c.nombre),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _carreraSeleccionadaId = v),
+                validator: (v) => v == null ? 'Seleccione una carrera' : null,
               ),
               const SizedBox(height: 16),
-              // Campo para semestre actual
               TextFormField(
                 controller: _semestreController,
-                decoration: const InputDecoration(
-                  labelText: 'Semestre Actual *',
-                  border: OutlineInputBorder(),
-                  hintText: 'Ej: 1',
-                ),
+                decoration: const InputDecoration(labelText: 'Semestre Actual *', border: OutlineInputBorder()),
                 keyboardType: TextInputType.number,
                 validator: (value) {
-                  if (value?.isEmpty == true) {
+                  if (value == null || value.isEmpty) {
                     return 'Campo requerido';
                   }
-                  final semestre = int.tryParse(value!);
+                  final semestre = int.tryParse(value);
                   if (semestre == null || semestre < 1 || semestre > 20) {
                     return 'Debe ser entre 1 y 20';
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _direccionController,
+                decoration: const InputDecoration(labelText: 'Dirección', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () async {
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _fechaNacimiento ?? DateTime(now.year - 18, now.month, now.day),
+                          firstDate: DateTime(1950),
+                          lastDate: DateTime(now.year - 10),
+                        );
+                        if (picked != null) {
+                          setState(() => _fechaNacimiento = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Fecha de nacimiento',
+                          border: OutlineInputBorder(),
+                        ),
+                        child: Text(_fechaNacimiento == null
+                            ? 'Seleccionar'
+                            : _fechaNacimiento!.toIso8601String().substring(0, 10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SwitchListTile(
+                      value: _activo,
+                      title: const Text('Activo'),
+                      onChanged: (v) => setState(() => _activo = v),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _mostrarDialogoContrasena(context),
+                  icon: const Icon(Icons.lock_reset),
+                  label: const Text('Cambiar contraseña'),
+                ),
               ),
             ],
           ),
@@ -1066,102 +423,118 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
       ],
     );
   }
-
   Future<void> _guardarEstudiante() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    final formulario = FormularioEstudiante(
-      nombres: _nombresController.text.trim(),
-      apellidos: _apellidosController.text.trim(),
-      email: _emailController.text.trim(),
-      telefono: _telefonoController.text.trim().isEmpty ? null : _telefonoController.text.trim(),
+    final estudiante = EstudianteAdmin(
+      id: widget.estudiante?.id ?? 0,
       codigoEstudiante: _codigoController.text.trim(),
-      carreraId: _carreraSeleccionada,
-      semestreActual: _semestreController.text.trim(),
+      nombreCompleto: _nombreController.text.trim(),
+      correoElectronico: _emailController.text.trim(),
+      telefono: _telefonoController.text.trim().isEmpty ? null : _telefonoController.text.trim(),
+      carreraId: _carreraSeleccionadaId,
+      semestreActual: int.tryParse(_semestreController.text.trim()),
+      fechaIngreso: widget.estudiante?.fechaIngreso ?? DateTime.now(),
+      fechaCreacion: widget.estudiante?.fechaCreacion ?? DateTime.now(),
+      fechaActualizacion: DateTime.now(),
+      direccion: _direccionController.text.trim().isEmpty ? null : _direccionController.text.trim(),
+      fechaNacimiento: _fechaNacimiento,
+      estado: _activo ? 'activo' : 'inactivo',
+      usuarioId: widget.estudiante?.usuarioId,
+      fotoPerfilUrl: widget.estudiante?.fotoPerfilUrl,
     );
-
-    final notifier = ref.read(estudiantesAdminProvider.notifier);
-    final success = widget.estudiante != null
-        ? await notifier.actualizarEstudiante(widget.estudiante!.id, formulario)
-        : await notifier.crearEstudiante(formulario);
-
-    if (mounted) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? '${widget.estudiante != null ? 'Estudiante actualizado' : 'Estudiante creado'} exitosamente'
-                : 'Error al ${widget.estudiante != null ? 'actualizar' : 'crear'} estudiante',
-          ),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
+    final notifier = ref.read(estudiantesProvider.notifier);
+    final creando = widget.estudiante == null;
+    final success = creando
+        ? await notifier.crearEstudiante(estudiante)
+        : await notifier.actualizarEstudiante(estudiante.id, estudiante);
+    if (!mounted) {
+      return;
     }
-  }
-}
-
-
-
-// Widget para mostrar detalles en el diálogo
-class _DetalleItem extends StatelessWidget {
-
-  const _DetalleItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.color,
-  });
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: color ?? AppConstants.textSecondary,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppConstants.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: color ?? AppConstants.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+    // Si es creación, setear contraseña inmediatamente por código
+    if (creando) {
+      final clave = _contrasenaAlCrearController.text.trim();
+      if (clave.isNotEmpty) {
+        try {
+          await _estRepo.actualizarContrasenaPorCodigo(
+            codigoEstudiante: _codigoController.text.trim(),
+            nuevaContrasena: clave,
+          );
+        } catch (_) {}
+      }
+    }
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'Estudiante guardado exitosamente' : 'Error al guardar estudiante'),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
     );
   }
 
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties..add(DiagnosticsProperty<IconData>('icon', icon))
-    ..add(StringProperty('label', label))
-    ..add(StringProperty('value', value))
-    ..add(ColorProperty('color', color));
+  void _mostrarDialogoContrasena(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Cambiar contraseña'),
+        content: SizedBox(
+          width: 360,
+          child: TextFormField(
+            controller: _nuevaContrasenaController,
+            decoration: const InputDecoration(
+              labelText: 'Nueva contraseña',
+              border: OutlineInputBorder(),
+              helperText: 'Se guardará en estudiantes y usuarios',
+            ),
+            obscureText: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialog).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final nueva = _nuevaContrasenaController.text;
+              if (nueva.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ingrese una contraseña válida'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+              final estudianteId = widget.estudiante?.id;
+              if (estudianteId == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Primero guarde el estudiante'), backgroundColor: Colors.orange),
+                );
+                return;
+              }
+              try {
+                await _estRepo.actualizarContrasena(
+                  estudianteId: estudianteId,
+                  nuevaContrasena: nueva,
+                  usuarioId: widget.estudiante?.usuarioId,
+                );
+                if (mounted) {
+                  Navigator.of(dialog).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Contraseña actualizada'), backgroundColor: Colors.green),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
   }
 }

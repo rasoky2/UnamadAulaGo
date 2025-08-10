@@ -1,6 +1,8 @@
+import 'package:aulago/models/estudiante.model.dart';
 import 'package:aulago/providers/auth.riverpod.dart';
 import 'package:aulago/repositories/estudiante.repository.dart';
 import 'package:aulago/utils/constants.dart';
+import 'package:aulago/widgets/foto_perfil_upload.widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -87,23 +89,27 @@ class PerfilAlumnoWidget extends ConsumerWidget {
   Widget _construirHeaderPerfil(usuario, bool esMovil) {
     return Row(
       children: [
-        // Avatar
-        Container(
-          width: esMovil ? 60 : 80,
-          height: esMovil ? 60 : 80,
-          decoration: BoxDecoration(
-            color: AppConstants.primaryColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(esMovil ? 30 : 40),
-            border: Border.all(
-              color: AppConstants.primaryColor.withValues(alpha: 0.3),
-              width: 2,
-            ),
-          ),
-          child: Icon(
-            LucideIcons.user,
-            size: esMovil ? 30 : 40,
-            color: AppConstants.primaryColor,
-          ),
+        // Avatar con foto de perfil
+        FotoPerfilUploadWidget(
+          usuarioId: usuario.id.toString(),
+          nombreCompleto: usuario.nombreCompleto,
+          tipoUsuario: 'estudiante',
+          fotoActualUrl: usuario.fotoPerfilUrl,
+          radio: esMovil ? 30 : 40,
+          onFotoSubida: (nuevaUrl) async {
+            // Actualizar la foto en la base de datos
+            try {
+              final repository = EstudianteRepository();
+              // Necesitamos obtener el estudiante completo por usuario_id
+              final estudianteCompleto = await repository.obtenerEstudiantePorUsuarioId(usuario.id);
+              if (estudianteCompleto != null) {
+                final estudianteActualizado = estudianteCompleto.copyWith(fotoPerfilUrl: nuevaUrl);
+                await repository.actualizarEstudiante(estudianteCompleto.id, estudianteActualizado);
+              }
+            } catch (e) {
+              debugPrint('Error al actualizar foto de perfil: $e');
+            }
+          },
         ),
         
         const SizedBox(width: 16),
@@ -362,31 +368,69 @@ class _DialogoEditarPerfilWidgetState extends ConsumerState<_DialogoEditarPerfil
   late TextEditingController _direccionController;
   DateTime? _fechaNacimiento;
   bool _guardando = false;
+  bool _cargandoDatos = true;
+  EstudianteAdmin? _estudiante;
 
   @override
   void initState() {
     super.initState();
-    final usuario = ref.read(proveedorAuthProvider).usuario;
-    
-    // Separar nombre completo en nombres y apellidos
-    String nombres = '';
-    String apellidos = '';
-    
-    if (usuario != null) {
-      final nombresSeparados = usuario.nombreCompleto.split(' ');
-      if (nombresSeparados.isNotEmpty) {
-        nombres = nombresSeparados.first;
-        if (nombresSeparados.length > 1) {
-          apellidos = nombresSeparados.skip(1).join(' ');
+    _cargarDatosEstudiante();
+  }
+
+  Future<void> _cargarDatosEstudiante() async {
+    try {
+      final usuario = ref.read(proveedorAuthProvider).usuario;
+      if (usuario != null) {
+        final repository = EstudianteRepository();
+        final estudiante = await repository.obtenerEstudiantePorUsuarioId(usuario.id);
+        
+        if (estudiante != null && mounted) {
+          setState(() {
+            _estudiante = estudiante;
+            _cargandoDatos = false;
+          });
+          _inicializarControladores(estudiante);
         }
       }
+    } catch (e) {
+      debugPrint('Error al cargar datos del estudiante: $e');
+      if (mounted) {
+        setState(() {
+          _cargandoDatos = false;
+        });
+        // Fallback a datos básicos del usuario
+        _inicializarControladoresBasicos();
+      }
     }
+  }
+
+  void _inicializarControladores(EstudianteAdmin estudiante) {
+    // Separar nombre completo en nombres y apellidos
+    final nombresSeparados = estudiante.nombreCompleto.split(' ');
+    final nombres = nombresSeparados.isNotEmpty ? nombresSeparados.first : '';
+    final apellidos = nombresSeparados.length > 1 ? nombresSeparados.skip(1).join(' ') : '';
     
     _nombresController = TextEditingController(text: nombres);
     _apellidosController = TextEditingController(text: apellidos);
-    _emailController = TextEditingController(text: usuario?.correoElectronico ?? '');
-    _telefonoController = TextEditingController(text: usuario?.perfil?['telefono'] ?? '');
-    _direccionController = TextEditingController(text: usuario?.perfil?['direccion'] ?? '');
+    _emailController = TextEditingController(text: estudiante.correoElectronico ?? '');
+    _telefonoController = TextEditingController(text: estudiante.telefono ?? '');
+    _direccionController = TextEditingController(text: estudiante.direccion ?? '');
+    _fechaNacimiento = estudiante.fechaNacimiento;
+  }
+
+  void _inicializarControladoresBasicos() {
+    final usuario = ref.read(proveedorAuthProvider).usuario;
+    if (usuario != null) {
+      final nombresSeparados = usuario.nombreCompleto.split(' ');
+      final nombres = nombresSeparados.isNotEmpty ? nombresSeparados.first : '';
+      final apellidos = nombresSeparados.length > 1 ? nombresSeparados.skip(1).join(' ') : '';
+      
+      _nombresController = TextEditingController(text: nombres);
+      _apellidosController = TextEditingController(text: apellidos);
+      _emailController = TextEditingController(text: usuario.correoElectronico ?? '');
+      _telefonoController = TextEditingController(text: '');
+      _direccionController = TextEditingController(text: '');
+    }
   }
 
   @override
@@ -405,12 +449,26 @@ class _DialogoEditarPerfilWidgetState extends ConsumerState<_DialogoEditarPerfil
       title: const Text('Editar Perfil'),
       content: SizedBox(
         width: widget.esMovil ? double.infinity : 400,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+        child: _cargandoDatos
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Cargando datos del perfil...'),
+                    ],
+                  ),
+                ),
+              )
+            : Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                 TextFormField(
                   controller: _nombresController,
                   decoration: const InputDecoration(
@@ -511,37 +569,34 @@ class _DialogoEditarPerfilWidgetState extends ConsumerState<_DialogoEditarPerfil
         throw Exception('Usuario no encontrado');
       }
 
-      final datos = {
-        'nombre_completo': '${_nombresController.text.trim()} ${_apellidosController.text.trim()}'.trim(),
-        'correo_electronico': _emailController.text.trim(),
-        'telefono': _telefonoController.text.trim().isEmpty ? null : _telefonoController.text.trim(),
-        'direccion': _direccionController.text.trim().isEmpty ? null : _direccionController.text.trim(),
-        'fecha_nacimiento': _fechaNacimiento?.toIso8601String(),
-      };
+      if (_estudiante == null) {
+        throw Exception('Datos del estudiante no cargados');
+      }
+
+      // Crear estudiante actualizado usando copyWith
+      final estudianteActualizado = _estudiante!.copyWith(
+        nombreCompleto: '${_nombresController.text.trim()} ${_apellidosController.text.trim()}'.trim(),
+        correoElectronico: _emailController.text.trim(),
+        telefono: _telefonoController.text.trim().isEmpty ? null : _telefonoController.text.trim(),
+        direccion: _direccionController.text.trim().isEmpty ? null : _direccionController.text.trim(),
+        fechaNacimiento: _fechaNacimiento,
+      );
 
       final repository = EstudianteRepository();
-      final success = await repository.actualizarPerfilEstudiante(usuario.id, datos);
-
+      await repository.actualizarEstudiante(_estudiante!.id, estudianteActualizado);
+      
       if (mounted) {
-        if (success) {
-          // Refrescar el provider de auth
-          ref.invalidate(proveedorAuthProvider);
-          
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Perfil actualizado exitosamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Error al actualizar el perfil'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        // Refrescar el provider de auth
+        ref.invalidate(proveedorAuthProvider);
+        
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Perfil actualizado exitosamente'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -549,6 +604,7 @@ class _DialogoEditarPerfilWidgetState extends ConsumerState<_DialogoEditarPerfil
           SnackBar(
             content: Text('Error: ${e.toString()}'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }

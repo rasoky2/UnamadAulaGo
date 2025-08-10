@@ -22,7 +22,7 @@ class PlataformaRepository extends BaseRepository<Map<String, dynamic>> {
   
   @override
   String getId(Map<String, dynamic> entity) {
-    return entity['id'] as String;
+    return entity['id'].toString();
   }
 
   /// Obtener estadísticas generales de la plataforma

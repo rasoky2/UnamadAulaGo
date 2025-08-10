@@ -1,19 +1,19 @@
-import 'package:aulago/providers/alumno/cursos.alumno.riverpod.dart';
+import 'package:aulago/models/tarea.model.dart';
+import 'package:aulago/repositories/tarea.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class TareasWidget extends ConsumerWidget {
+class TareasWidget extends StatelessWidget {
   const TareasWidget({super.key, this.onRegresar});
   final VoidCallback? onRegresar;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[TareasWidget] Solicitando tareas (sin grupoClaseId)');
-    final tareasAsync = ref.watch(tareasProvider);
+  Widget build(BuildContext context) {
+    debugPrint('[TareasWidget] Solicitando tareas (cliente)');
+    final repo = TareaRepository();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -53,22 +53,28 @@ class TareasWidget extends ConsumerWidget {
           const SizedBox(height: 24),
           
           // Tabla de tareas
-          tareasAsync.when(
-            data: (tareas) {
+          FutureBuilder<List<ModeloTarea>>(
+            future: repo.obtenerTareas(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return const Center(child: Text('Datos no cargados'));
+              }
+              final tareas = snapshot.data ?? [];
               if (tareas.isEmpty) {
-                return const Center(child: Text("Datos no encontrados"));
+                return const Center(child: Text('Datos no encontrados'));
               }
               return _construirTablaTareas(tareas);
             },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, stack) => const Center(child: Text("Datos no cargados")),
           ),
         ],
       ),
     );
   }
 
-  Widget _construirTablaTareas(List<Map<String, dynamic>> tareas) {
+  Widget _construirTablaTareas(List<ModeloTarea> tareas) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -153,14 +159,12 @@ class TareasWidget extends ConsumerWidget {
     );
   }
 
-  Widget _construirFilaTarea(Map<String, dynamic> tarea, int index) {
+  Widget _construirFilaTarea(ModeloTarea tarea, int index) {
     final esParImpar = index % 2 == 0;
-    final String estado = tarea['estado_entrega'] ?? 'Pendiente';
+    final String estado = tarea.estado.isNotEmpty ? tarea.estado : 'pendiente';
     final Color colorEstado = _obtenerColorEstado(estado);
-    final String fechaLimiteStr = tarea['fecha_entrega'] != null
-        ? DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(tarea['fecha_entrega']))
-        : 'Sin fecha';
-    final bool esVencida = tarea['fecha_entrega'] != null && DateTime.parse(tarea['fecha_entrega']).isBefore(DateTime.now());
+    final String fechaLimiteStr = DateFormat('dd/MM/yyyy HH:mm').format(tarea.fechaEntrega);
+    final bool esVencida = tarea.fechaEntrega.isBefore(DateTime.now());
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -181,8 +185,8 @@ class TareasWidget extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      tarea['titulo'] ?? 'Sin título',
+                      Text(
+                        tarea.titulo,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -224,10 +228,10 @@ class TareasWidget extends ConsumerWidget {
                 ),
               ),
               // Calificación
-              Expanded(
+              const Expanded(
                 child: Text(
-                  tarea['calificacion']?.toString() ?? '-',
-                  style: const TextStyle(
+                  '-',
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppConstants.textPrimary,

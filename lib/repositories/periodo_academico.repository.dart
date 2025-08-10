@@ -21,7 +21,7 @@ class PeriodoAcademicoRepository extends BaseRepository<Map<String, dynamic>> {
   
   @override
   String getId(Map<String, dynamic> entity) {
-    return entity['id'] as String;
+    return entity['id'].toString();
   }
 
   /// Obtener períodos académicos

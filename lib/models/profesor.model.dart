@@ -3,19 +3,22 @@ import 'package:aulago/models/usuario.model.dart';
 class ProfesorAdmin {
 
   factory ProfesorAdmin.fromJson(Map<String, dynamic> json) {
-    if (json['usuarios'] == null) {
-      throw Exception('El objeto de usuario no puede ser nulo en la respuesta del profesor.');
-    }
+    final idStr = json['id']?.toString() ?? '0';
+
+    // Si no vino el join de usuarios, construir el usuario desde la propia fila de profesores
+    final ModeloUsuario usuario = json['usuarios'] != null
+        ? ModeloUsuario.fromJson(json['usuarios'] as Map<String, dynamic>)
+        : ModeloUsuario.fromProfesorJson(json);
     
     return ProfesorAdmin(
-      id: json['id'] as String,
-      usuario: ModeloUsuario.fromJson(json['usuarios'] as Map<String, dynamic>),
-      especialidad: json['especialidad'] as String?,
-      gradoAcademico: json['grado_academico'] as String?,
-      facultadId: json['facultad_id'] as String?,
-      facultadNombre: (json['facultades'] as Map<String, dynamic>?)?['nombre'] as String?,
-      fechaCreacion: DateTime.parse(json['fecha_creacion'] as String),
-      fechaActualizacion: DateTime.parse(json['fecha_actualizacion'] as String),
+      id: idStr,
+      usuario: usuario,
+      especialidad: json['especialidad']?.toString(),
+      gradoAcademico: json['grado_academico']?.toString(),
+      facultadId: json['facultad_id']?.toString(),
+      facultadNombre: (json['facultades'] as Map<String, dynamic>?)?['nombre']?.toString(),
+      fechaCreacion: DateTime.tryParse(json['fecha_creacion']?.toString() ?? '') ?? DateTime.now(),
+      fechaActualizacion: DateTime.tryParse(json['fecha_actualizacion']?.toString() ?? '') ?? DateTime.now(),
       estado: json['estado']?.toString() ?? 'activo',
     );
   }
@@ -72,6 +75,19 @@ class ProfesorAdmin {
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       estado: estado ?? this.estado,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'usuario_id': usuario.id,
+      'especialidad': especialidad,
+      'grado_academico': gradoAcademico,
+      'facultad_id': facultadId,
+      'fecha_creacion': fechaCreacion.toIso8601String(),
+      'fecha_actualizacion': fechaActualizacion.toIso8601String(),
+      'estado': estado,
+    };
   }
 
   @override
