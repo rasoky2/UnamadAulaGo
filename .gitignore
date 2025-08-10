@@ -23,7 +23,7 @@ arquitecture.md
 
 pubspec.lock
 
-
+!build/web
 
 # Android Studio will place build artifacts here
 /android/app/debug
