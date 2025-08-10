@@ -1,9 +1,14 @@
+import 'package:aulago/models/evento_calendario.model.dart';
+import 'package:aulago/providers/auth.riverpod.dart';
+import 'package:aulago/repositories/calendario.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class CalendarioWidget extends StatefulWidget {
+class CalendarioWidget extends ConsumerStatefulWidget {
 
   const CalendarioWidget({
     super.key,
@@ -12,7 +17,7 @@ class CalendarioWidget extends StatefulWidget {
   final VoidCallback onRegresar;
 
   @override
-  State<CalendarioWidget> createState() => _CalendarioWidgetState();
+  ConsumerState<CalendarioWidget> createState() => _CalendarioWidgetState();
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
@@ -21,7 +26,98 @@ class CalendarioWidget extends StatefulWidget {
   }
 }
 
-class _CalendarioWidgetState extends State<CalendarioWidget> {
+class _CalendarioWidgetState extends ConsumerState<CalendarioWidget> {
+  final CalendarioRepository _calendarioRepo = CalendarioRepository();
+  
+  // Estado del calendario
+  DateTime _fechaActual = DateTime.now();
+  DateTime _fechaSeleccionada = DateTime.now();
+  List<EventoCalendario> _eventosDelMes = [];
+  List<EventoCalendario> _eventosDelDiaSeleccionado = [];
+  bool _cargandoEventos = false;
+  
+  // Vista del calendario
+  VistaCalendario _vistaActual = VistaCalendario.mes;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _cargarEventosDelMes();
+    });
+  }
+
+  /// Carga los eventos del mes actual
+  Future<void> _cargarEventosDelMes() async {
+    final estadoAuth = ref.read(proveedorAuthProvider);
+    if (estadoAuth.usuario == null) {
+      return;
+    }
+
+    setState(() => _cargandoEventos = true);
+
+    try {
+      final eventos = await _calendarioRepo.obtenerEventosDelMes(
+        estadoAuth.usuario!.id,
+        _fechaActual.year,
+        _fechaActual.month,
+      );
+
+      setState(() {
+        _eventosDelMes = eventos;
+        _cargarEventosDelDia(_fechaSeleccionada);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error cargando eventos: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _cargandoEventos = false);
+    }
+  }
+
+  /// Carga los eventos del día seleccionado
+  void _cargarEventosDelDia(DateTime fecha) {
+    final eventosDelDia = _eventosDelMes
+        .where((evento) => evento.fechaEvento.esMismoDia(fecha))
+        .toList()
+
+    ..sort((a, b) => a.fechaEvento.compareTo(b.fechaEvento));
+
+    setState(() {
+      _fechaSeleccionada = fecha;
+      _eventosDelDiaSeleccionado = eventosDelDia;
+    });
+  }
+
+  /// Navega al mes anterior
+  void _mesAnterior() {
+    setState(() {
+      _fechaActual = DateTime(_fechaActual.year, _fechaActual.month - 1);
+    });
+    _cargarEventosDelMes();
+  }
+
+  /// Navega al mes siguiente
+  void _mesSiguiente() {
+    setState(() {
+      _fechaActual = DateTime(_fechaActual.year, _fechaActual.month + 1);
+    });
+    _cargarEventosDelMes();
+  }
+
+  /// Cambia la vista del calendario
+  void _cambiarVista(VistaCalendario nuevaVista) {
+    setState(() {
+      _vistaActual = nuevaVista;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -109,16 +205,18 @@ class _CalendarioWidgetState extends State<CalendarioWidget> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                onPressed: () {},
+                onPressed: _cargandoEventos ? null : _mesAnterior,
                 icon: const Icon(LucideIcons.chevronLeft200, size: 20),
                 padding: const EdgeInsets.all(8),
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                tooltip: 'Mes anterior',
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: _cargandoEventos ? null : _mesSiguiente,
                 icon: const Icon(LucideIcons.chevronRight200, size: 20),
                 padding: const EdgeInsets.all(8),
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                tooltip: 'Mes siguiente',
               ),
             ],
           ),
@@ -127,9 +225,9 @@ class _CalendarioWidgetState extends State<CalendarioWidget> {
         const Spacer(),
         
         // Título del mes
-        const Text(
-          'junio 2025',
-          style: TextStyle(
+        Text(
+          '${_fechaActual.nombreMes} ${_fechaActual.year}',
+          style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
             color: AppConstants.textPrimary,
@@ -146,36 +244,47 @@ class _CalendarioWidgetState extends State<CalendarioWidget> {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              _construirPestanaVista('Mes', true),
-              _construirPestanaVista('Semana', false),
-              _construirPestanaVista('Día', false),
-            ],
+            children: VistaCalendario.values.map((vista) => 
+              _construirPestanaVista(vista.nombre, _vistaActual == vista, vista)
+            ).toList(),
           ),
         ),
       ],
     );
   }
 
-  Widget _construirPestanaVista(String texto, bool activa) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: activa ? Colors.grey.shade100 : null,
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: Text(
-        texto,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: activa ? FontWeight.w600 : FontWeight.normal,
-          color: activa ? AppConstants.textPrimary : AppConstants.textSecondary,
+  Widget _construirPestanaVista(String texto, bool activa, VistaCalendario vista) {
+    return InkWell(
+      onTap: () => _cambiarVista(vista),
+      borderRadius: BorderRadius.circular(3),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: activa ? Colors.grey.shade100 : null,
+          borderRadius: BorderRadius.circular(3),
+        ),
+        child: Text(
+          texto,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: activa ? FontWeight.w600 : FontWeight.normal,
+            color: activa ? AppConstants.textPrimary : AppConstants.textSecondary,
+          ),
         ),
       ),
     );
   }
 
   Widget _construirCalendario() {
+    if (_cargandoEventos) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     const diasSemana = ['LUN.', 'MAR.', 'MIÉ.', 'JUE.', 'VIE.', 'SÁB.', 'DOM.'];
     
     return Column(
@@ -206,145 +315,391 @@ class _CalendarioWidgetState extends State<CalendarioWidget> {
         
         // Filas del calendario
         Expanded(
-          child: Column(
-            children: [
-              _construirFilaCalendario(['26', '27', '28', '29', '30', '31', '1'], otroMes: [true, true, true, true, true, true, false]),
-              _construirFilaCalendario(['2', '3', '4', '5', '6', '7', '8']),
-              _construirFilaCalendario(['9', '10', '11', '12', '13', '14', '15']),
-              _construirFilaCalendario(['16', '17', '18', '19', '20', '21', '22'], destacado: [false, false, false, false, false, false, true]),
-              _construirFilaCalendario(['23', '24', '25', '26', '27', '28', '29']),
-              _construirFilaCalendario(['30', '1', '2', '3', '4', '5', '6'], otroMes: [false, true, true, true, true, true, true]),
-            ],
-          ),
+          child: _construirFilasCalendario(),
         ),
       ],
     );
   }
 
-  Widget _construirFilaCalendario(List<String> dias, {List<bool>? otroMes, List<bool>? destacado}) {
+  Widget _construirFilasCalendario() {
+    final primerDiaDelMes = DateTime(_fechaActual.year, _fechaActual.month);
+    final ultimoDiaDelMes = DateTime(_fechaActual.year, _fechaActual.month + 1, 0);
+    
+    // Calcular el primer día a mostrar (lunes de la semana que contiene el primer día del mes)
+    final int diasParaRetroceder = primerDiaDelMes.weekday - 1;
+    final primerDiaAMostrar = primerDiaDelMes.subtract(Duration(days: diasParaRetroceder));
+    
+    // Generar todas las fechas del calendario (6 semanas)
+    final fechasCalendario = <DateTime>[];
+    for (int i = 0; i < 42; i++) {
+      fechasCalendario.add(primerDiaAMostrar.add(Duration(days: i)));
+    }
+    
+    // Dividir en filas de 7 días
+    final filas = <Widget>[];
+    for (int i = 0; i < 6; i++) {
+      final fechasDeLaFila = fechasCalendario.skip(i * 7).take(7).toList();
+      filas.add(_construirFilaCalendarioReal(fechasDeLaFila, ultimoDiaDelMes));
+    }
+    
+    return Column(children: filas);
+  }
+
+  Widget _construirFilaCalendarioReal(List<DateTime> fechas, DateTime ultimoDiaDelMes) {
     return Expanded(
       child: Row(
-        children: List.generate(dias.length, (index) {
-          final esOtroMes = otroMes?[index] ?? false;
-          final esDestacado = destacado?[index] ?? false;
+        children: fechas.map((fecha) {
+          final esDelMesActual = fecha.month == _fechaActual.month;
+          final esFechaSeleccionada = fecha.esMismoDia(_fechaSeleccionada);
+          final esHoy = fecha.esMismoDia(DateTime.now());
+          final eventosDelDia = _eventosDelMes.where((e) => e.fechaEvento.esMismoDia(fecha)).toList();
           
           return Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300, width: 0.5),
-                color: esDestacado ? Colors.blue.shade50 : null,
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {},
-                  child: Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    padding: const EdgeInsets.all(4),
-                    alignment: Alignment.topLeft,
-                    child: esDestacado
-                        ? Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              dias[index],
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            dias[index],
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: esOtroMes ? AppConstants.textTertiary : AppConstants.textPrimary,
-                              fontWeight: FontWeight.normal,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
+            child: _construirCeldaCalendario(
+              fecha,
+              esDelMesActual: esDelMesActual,
+              esFechaSeleccionada: esFechaSeleccionada,
+              esHoy: esHoy,
+              eventos: eventosDelDia,
             ),
           );
-        }),
+        }).toList(),
       ),
     );
   }
 
+  Widget _construirCeldaCalendario(
+    DateTime fecha, {
+    required bool esDelMesActual,
+    required bool esFechaSeleccionada,
+    required bool esHoy,
+    required List<EventoCalendario> eventos,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300, width: 0.5),
+        color: esFechaSeleccionada ? Colors.blue.shade50 : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _cargarEventosDelDia(fecha),
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            padding: const EdgeInsets.all(4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Número del día
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: esHoy
+                          ? const BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                            )
+                          : esFechaSeleccionada
+                              ? BoxDecoration(
+                                  color: Colors.blue.shade200,
+                                  shape: BoxShape.circle,
+                                )
+                              : null,
+                      child: Text(
+                        '${fecha.day}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: esHoy ? FontWeight.bold : FontWeight.normal,
+                          color: esHoy
+                              ? Colors.white
+                              : esFechaSeleccionada
+                                  ? Colors.blue.shade800
+                                  : esDelMesActual
+                                      ? AppConstants.textPrimary
+                                      : AppConstants.textTertiary,
+                        ),
+                      ),
+                    ),
+                    // Indicador de eventos
+                    if (eventos.isNotEmpty)
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: eventos.length > 1 ? Colors.red : Color(eventos.first.colorEvento),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
+                ),
+                // Mini lista de eventos (solo en celdas más grandes)
+                if (eventos.isNotEmpty)
+                  Expanded(
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: eventos.length > 2 ? 2 : eventos.length,
+                      itemBuilder: (context, index) {
+                        final evento = eventos[index];
+                        return Container(
+                          margin: const EdgeInsets.only(top: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Color(evento.colorEvento).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: Text(
+                            evento.titulo,
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: Color(evento.colorEvento),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (eventos.length > 2)
+                  Text(
+                    '+${eventos.length - 2} más',
+                    style: TextStyle(
+                      fontSize: 7,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
   Widget _construirFooterCalendario() {
     return Container(
       padding: const EdgeInsets.only(top: 16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Fecha seleccionada destacada
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.blue,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Text(
-              '31',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Text(
-            'Sincronizar',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppConstants.textSecondary,
-            ),
-          ),
-          
-          const Spacer(),
-          
-          // Botón agregar fechas importantes
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: AppConstants.primaryColor),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {},
-                borderRadius: BorderRadius.circular(4),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        LucideIcons.plus200,
-                        size: 16,
-                        color: AppConstants.primaryColor,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Agregar más\nfechas importantes',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppConstants.primaryColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+          // Información del día seleccionado
+          Row(
+            children: [
+              // Fecha seleccionada destacada
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${_fechaSeleccionada.day}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, d MMMM y', 'es_ES').format(_fechaSeleccionada),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppConstants.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      _eventosDelDiaSeleccionado.isEmpty 
+                          ? 'No hay eventos programados'
+                          : '${_eventosDelDiaSeleccionado.length} evento(s)',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Botón de sincronización (futuro Google Calendar)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppConstants.primaryColor),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _mostrarDialogoSincronizacion,
+                    borderRadius: BorderRadius.circular(4),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            LucideIcons.refreshCw,
+                            size: 16,
+                            color: AppConstants.primaryColor,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Sincronizar',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppConstants.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          // Lista de eventos del día seleccionado
+          if (_eventosDelDiaSeleccionado.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Eventos del día:',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppConstants.textPrimary,
+              ),
             ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _eventosDelDiaSeleccionado.length,
+                itemBuilder: (context, index) {
+                  final evento = _eventosDelDiaSeleccionado[index];
+                  return _construirTarjetaEvento(evento);
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _construirTarjetaEvento(EventoCalendario evento) {
+    return Container(
+      width: 200,
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Color(evento.colorEvento).withValues(alpha: 0.1),
+        border: Border.all(color: Color(evento.colorEvento).withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Color(evento.colorEvento),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  evento.tipo.nombre,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (evento.diasRestantes != null)
+                Text(
+                  evento.textoPrioridad,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: evento.esFechaPasada ? Colors.red : Colors.orange,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            evento.titulo,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppConstants.textPrimary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (evento.cursoNombre != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              evento.cursoNombre!,
+              style: const TextStyle(
+                fontSize: 10,
+                color: AppConstants.textSecondary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const Spacer(),
+          Text(
+            DateFormat('HH:mm').format(evento.fechaEvento),
+            style: TextStyle(
+              fontSize: 10,
+              color: Color(evento.colorEvento),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarDialogoSincronizacion() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(LucideIcons.calendar200, color: AppConstants.primaryColor),
+            SizedBox(width: 8),
+            Text('Sincronización con Google Calendar'),
+          ],
+        ),
+        content: const Text(
+          'La sincronización con Google Calendar estará disponible próximamente. '
+          'Podrás sincronizar automáticamente tus tareas, exámenes y eventos importantes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
           ),
         ],
       ),

@@ -1,5 +1,5 @@
 import 'package:aulago/models/estadisticas_admin.model.dart';
-import 'package:aulago/providers/admin/home.admin.riverpod.dart';
+import 'package:aulago/providers/admin/estadisticas.admin.riverpod.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +19,9 @@ class PantallaHomeAdmin extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Tarjetas de estadísticas
-          _EstadisticasSistema(estadisticas: estadisticas),
+          _EstadisticasSistema(estadisticas: estadisticas, onRefresh: () {
+            ref.read(estadisticasAdminProvider.notifier).refrescar();
+          }),
           
           const SizedBox(height: AppConstants.largePadding),
           
@@ -39,21 +41,38 @@ class PantallaHomeAdmin extends ConsumerWidget {
 // Estadísticas del sistema UI puro
 class _EstadisticasSistema extends StatelessWidget {
   
-  const _EstadisticasSistema({required this.estadisticas});
+  const _EstadisticasSistema({required this.estadisticas, required this.onRefresh});
   final EstadisticasAdmin estadisticas;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Estadísticas del Sistema',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppConstants.textPrimary,
-          ),
+        Row(
+          children: [
+            const Text(
+              'Estadísticas del Sistema',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppConstants.textPrimary,
+              ),
+            ),
+            const Spacer(),
+            IconButton(
+              onPressed: estadisticas.cargando ? null : onRefresh,
+              icon: estadisticas.cargando 
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              tooltip: 'Refrescar estadísticas',
+            ),
+          ],
         ),
         const SizedBox(height: AppConstants.defaultPadding),
         if (estadisticas.cargando)
@@ -123,7 +142,8 @@ class _EstadisticasSistema extends StatelessWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty<EstadisticasAdmin>('estadisticas', estadisticas));
+    properties..add(DiagnosticsProperty<EstadisticasAdmin>('estadisticas', estadisticas))
+    ..add(ObjectFlagProperty<VoidCallback>.has('onRefresh', onRefresh));
   }
 }
 

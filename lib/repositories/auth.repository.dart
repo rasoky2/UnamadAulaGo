@@ -47,7 +47,7 @@ class AuthRepository {
               if (estudianteResponse != null) {
                 final estudianteCompleto = EstudianteAdmin.fromJson(estudianteResponse);
                 final usuarioConPerfil = usuario.copyWith(perfil: estudianteCompleto);
-                await _establecerSesion(usuario.id, usuario.rol);
+                await _establecerSesion(usuario.id.toString(), usuario.rol);
                 await guardarDatosUsuario(usuarioConPerfil);
                 
                 ApiLogger.logGet(
@@ -69,7 +69,7 @@ class AuthRepository {
             }
           }
           
-          await _establecerSesion(usuario.id, usuario.rol);
+          await _establecerSesion(usuario.id.toString(), usuario.rol);
           await guardarDatosUsuario(usuario);
           
           ApiLogger.logGet(
@@ -109,7 +109,7 @@ class AuthRepository {
             // Cargar datos completos del estudiante para el perfil
             final estudianteCompleto = EstudianteAdmin.fromJson(estudianteResponse);
             final usuarioConPerfil = usuario.copyWith(perfil: estudianteCompleto);
-            await _establecerSesion(usuario.id, usuario.rol);
+            await _establecerSesion(usuario.id.toString(), usuario.rol);
           await guardarDatosUsuario(usuarioConPerfil);
             return usuarioConPerfil;
         }
@@ -143,7 +143,7 @@ class AuthRepository {
              if (!usuario.activo) {
                 throw Exception('El usuario se encuentra inactivo. Comuníquese con soporte.');
             }
-            await _establecerSesion(usuario.id, usuario.rol);
+            await _establecerSesion(usuario.id.toString(), usuario.rol);
           await guardarDatosUsuario(usuario);
             return usuario;
         }
@@ -477,6 +477,18 @@ class AuthRepository {
     if (userId == null || userRole == null || nombreCompleto == null || codigoUsuario == null) {
       return null;
     }
+
+    // Manejar IDs legados no numéricos (por ejemplo UUIDs antiguos)
+    final int? parsedUserId = int.tryParse(userId);
+    if (parsedUserId == null) {
+      ApiLogger.logError(
+        operation: 'recuperarDatosUsuario',
+        table: 'user_data_cache',
+        error: 'userId_not_numeric',
+        additionalInfo: 'Valor almacenado: $userId (probable UUID legado) — devolviendo null para forzar verificación remota',
+      );
+      return null;
+    }
     
     // Verificar que los datos no sean demasiado antiguos (7 días)
     if (dataTimestamp != null) {
@@ -496,7 +508,7 @@ class AuthRepository {
     
     // Crear el modelo de usuario desde caché
     final usuario = ModeloUsuario(
-      id: userId,
+      id: parsedUserId,
       codigoUsuario: codigoUsuario,
       nombreCompleto: nombreCompleto,
       correoElectronico: correoElectronico?.isEmpty == true ? null : correoElectronico,

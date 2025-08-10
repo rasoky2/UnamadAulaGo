@@ -17,19 +17,19 @@ class ModeloCarrera {
 
   factory ModeloCarrera.fromJson(Map<String, dynamic> json) {
     return ModeloCarrera(
-      id: json['id'] as String? ?? '',
-      codigo: json['codigo'] as String? ?? '',
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      facultadId: json['facultad_id'] is int ? json['facultad_id'] : int.tryParse(json['facultad_id'].toString()) ?? 0,
       nombre: json['nombre'] as String? ?? '',
-      descripcion: json['descripcion'] as String? ?? '',
-      facultadId: json['facultad_id'] as String? ?? '',
+      codigo: json['codigo'] as String? ?? '',
+      descripcion: json['descripcion'] as String?,
       duracionSemestres: json['duracion_semestres'] is int ? json['duracion_semestres'] as int : int.tryParse(json['duracion_semestres']?.toString() ?? '') ?? 0,
-      directorNombre: json['director_nombre'] as String? ?? '',
-      directorEmail: json['director_email'] as String? ?? '',
+      directorNombre: json['director_nombre'] as String?,
+      directorEmail: json['director_email'] as String?,
       fechaCreacion: json['fecha_creacion'] != null ? DateTime.tryParse(json['fecha_creacion'].toString()) ?? DateTime.now() : DateTime.now(),
     );
   }
-  final String id;
-  final String facultadId;
+  final int id;
+  final int facultadId;
   final String nombre;
   final String codigo;
   final String? descripcion;
@@ -53,8 +53,8 @@ class ModeloCarrera {
   }
 
   ModeloCarrera copyWith({
-    String? id,
-    String? facultadId,
+    int? id,
+    int? facultadId,
     String? nombre,
     String? codigo,
     String? descripcion,
@@ -94,8 +94,8 @@ class ModeloCarrera {
 
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     properties
-      ..add(StringProperty('id', id))
-      ..add(StringProperty('facultadId', facultadId))
+      ..add(StringProperty('id', id.toString()))
+      ..add(StringProperty('facultadId', facultadId.toString()))
       ..add(StringProperty('nombre', nombre))
       ..add(StringProperty('codigo', codigo))
       ..add(StringProperty('descripcion', descripcion))
@@ -171,11 +171,11 @@ class CrearEditarCarreraData {
     this.directorNombre,
     this.directorEmail,
   });
-  final String? id;
+  final int? id;
   final String nombre;
   final String codigo;
   final String? descripcion;
-  final String facultadId;
+  final int facultadId;
   final int duracionSemestres;
   final String? directorNombre;
   final String? directorEmail;
@@ -199,11 +199,11 @@ class CrearEditarCarreraData {
   }
 
   CrearEditarCarreraData copyWith({
-    String? id,
+    int? id,
     String? nombre,
     String? codigo,
     String? descripcion,
-    String? facultadId,
+    int? facultadId,
     int? duracionSemestres,
     String? directorNombre,
     String? directorEmail,
@@ -223,7 +223,7 @@ class CrearEditarCarreraData {
   bool get esValido {
     return nombre.trim().isNotEmpty &&
            codigo.trim().isNotEmpty &&
-           facultadId.isNotEmpty &&
+           facultadId > 0 &&
            duracionSemestres > 0;
   }
 } 

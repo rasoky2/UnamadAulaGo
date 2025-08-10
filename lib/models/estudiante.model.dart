@@ -20,47 +20,49 @@ class EstudianteAdmin {
     this.fechaActualizacion,
     this.usuarioId,
     this.estadisticas,
+    this.fotoPerfilUrl,
   });
 
   factory EstudianteAdmin.fromJson(Map<String, dynamic> json) {
     return EstudianteAdmin(
-      id: json['id']?.toString() ?? '',
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
       codigoEstudiante: json['codigo_estudiante']?.toString() ?? '',
       nombreCompleto: json['nombre_completo']?.toString() ?? '',
       correoElectronico: json['correo_electronico']?.toString(),
       telefono: json['telefono']?.toString(),
       fechaNacimiento: json['fecha_nacimiento'] != null
-          ? DateTime.parse(json['fecha_nacimiento'].toString())
+          ? DateTime.tryParse(json['fecha_nacimiento'].toString())
           : null,
       direccion: json['direccion']?.toString(),
-      carreraId: json['carrera_id']?.toString(),
+      carreraId: json['carrera_id'] is int ? json['carrera_id'] : int.tryParse(json['carrera_id']?.toString() ?? ''),
       carreraNombre: json['carrera_nombre']?.toString(),
       semestreActual: json['semestre_actual'] as int?,
       estado: json['estado']?.toString() ?? 'activo',
       rol: json['rol']?.toString() ?? 'estudiante',
       fechaIngreso: json['fecha_ingreso'] != null
-          ? DateTime.parse(json['fecha_ingreso'].toString())
+          ? DateTime.tryParse(json['fecha_ingreso'].toString())
           : null,
       fechaCreacion: json['fecha_creacion'] != null
-          ? DateTime.parse(json['fecha_creacion'].toString())
+          ? DateTime.tryParse(json['fecha_creacion'].toString())
           : null,
       fechaActualizacion: json['fecha_actualizacion'] != null
-          ? DateTime.parse(json['fecha_actualizacion'].toString())
+          ? DateTime.tryParse(json['fecha_actualizacion'].toString())
           : null,
-      usuarioId: json['usuario_id']?.toString(),
+      usuarioId: json['usuario_id'] is int ? json['usuario_id'] : int.tryParse(json['usuario_id']?.toString() ?? ''),
       estadisticas: json['estadisticas'] != null
           ? ModeloEstadisticasEstudiante.fromJson(json['estadisticas'])
           : null,
+      fotoPerfilUrl: json['foto_perfil_url']?.toString(),
     );
   }
-  final String id;
+  final int id;
   final String codigoEstudiante;
   final String nombreCompleto;
   final String? correoElectronico;
   final String? telefono;
   final DateTime? fechaNacimiento;
   final String? direccion;
-  final String? carreraId;
+  final int? carreraId;
   final String? carreraNombre;
   final int? semestreActual;
   final String estado; // 'activo' o 'inactivo'
@@ -68,8 +70,9 @@ class EstudianteAdmin {
   final DateTime? fechaIngreso;
   final DateTime? fechaCreacion;
   final DateTime? fechaActualizacion;
-  final String? usuarioId;
+  final int? usuarioId;
   final ModeloEstadisticasEstudiante? estadisticas;
+  final String? fotoPerfilUrl;
 
   // Getters para compatibilidad con el código existente
   bool get activo => estado == 'activo';
@@ -82,14 +85,14 @@ class EstudianteAdmin {
   }
 
   EstudianteAdmin copyWith({
-    String? id,
+    int? id,
     String? codigoEstudiante,
     String? nombreCompleto,
     String? correoElectronico,
     String? telefono,
     DateTime? fechaNacimiento,
     String? direccion,
-    String? carreraId,
+    int? carreraId,
     String? carreraNombre,
     int? semestreActual,
     String? estado,
@@ -97,8 +100,9 @@ class EstudianteAdmin {
     DateTime? fechaIngreso,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
-    String? usuarioId,
+    int? usuarioId,
     ModeloEstadisticasEstudiante? estadisticas,
+    String? fotoPerfilUrl,
   }) {
     return EstudianteAdmin(
       id: id ?? this.id,
@@ -118,7 +122,29 @@ class EstudianteAdmin {
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       usuarioId: usuarioId ?? this.usuarioId,
       estadisticas: estadisticas ?? this.estadisticas,
+      fotoPerfilUrl: fotoPerfilUrl ?? this.fotoPerfilUrl,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'codigo_estudiante': codigoEstudiante,
+      'nombre_completo': nombreCompleto,
+      'correo_electronico': correoElectronico,
+      'telefono': telefono,
+      'fecha_nacimiento': fechaNacimiento?.toIso8601String(),
+      'direccion': direccion,
+      'carrera_id': carreraId,
+      'semestre_actual': semestreActual,
+      'estado': estado,
+      'rol': rol,
+      'fecha_ingreso': fechaIngreso?.toIso8601String(),
+      'fecha_creacion': fechaCreacion?.toIso8601String(),
+      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
+      'usuario_id': usuarioId,
+      'foto_perfil_url': fotoPerfilUrl,
+    };
   }
 }
 
@@ -133,7 +159,7 @@ class ModeloEstadisticasEstudiante {
     this.porcentajeAsistencia = 0.0,
     this.tareasCompletadas = 0,
     this.tareasPendientes = 0,
-    this.forosParticipados = 0,
+  
   });
 
   factory ModeloEstadisticasEstudiante.fromJson(Map<String, dynamic> json) {
@@ -144,7 +170,7 @@ class ModeloEstadisticasEstudiante {
       porcentajeAsistencia: (json['porcentaje_asistencia'] as num?)?.toDouble() ?? 0.0,
       tareasCompletadas: json['tareas_completadas'] as int? ?? 0,
       tareasPendientes: json['tareas_pendientes'] as int? ?? 0,
-      forosParticipados: json['foros_participados'] as int? ?? 0,
+      
     );
   }
   final int cursosActivos;
@@ -153,7 +179,7 @@ class ModeloEstadisticasEstudiante {
   final double porcentajeAsistencia;
   final int tareasCompletadas;
   final int tareasPendientes;
-  final int forosParticipados;
+
 
   Map<String, dynamic> toJson() {
     return {
@@ -163,7 +189,7 @@ class ModeloEstadisticasEstudiante {
       'porcentaje_asistencia': porcentajeAsistencia,
       'tareas_completadas': tareasCompletadas,
       'tareas_pendientes': tareasPendientes,
-      'foros_participados': forosParticipados,
+      
     };
   }
 }
@@ -246,6 +272,7 @@ class FormularioEstudiante {
     this.activo = true,
     this.fechaNacimiento,
     this.direccion,
+    this.fotoPerfilUrl,
   });
 
   factory FormularioEstudiante.fromEstudiante(EstudianteAdmin estudiante) {
@@ -262,19 +289,21 @@ class FormularioEstudiante {
       activo: estudiante.activo,
       fechaNacimiento: estudiante.fechaNacimiento,
       direccion: estudiante.direccion,
+      fotoPerfilUrl: estudiante.fotoPerfilUrl,
     );
   }
-  final String? id;
+  final int? id;
   final String nombres;
   final String apellidos;
   final String email;
   final String? telefono;
   final String codigoEstudiante;
-  final String? carreraId;
+  final int? carreraId;
   final String? semestreActual;
   final bool activo;
   final DateTime? fechaNacimiento;
   final String? direccion;
+  final String? fotoPerfilUrl;
 
   Map<String, dynamic> toJson() {
     return {
@@ -289,21 +318,23 @@ class FormularioEstudiante {
       'fecha_nacimiento': fechaNacimiento?.toIso8601String(),
       'direccion': direccion,
       'rol': 'estudiante',
+      'foto_perfil_url': fotoPerfilUrl,
     };
   }
 
   FormularioEstudiante copyWith({
-    String? id,
+    int? id,
     String? nombres,
     String? apellidos,
     String? email,
     String? telefono,
     String? codigoEstudiante,
-    String? carreraId,
+    int? carreraId,
     String? semestreActual,
     bool? activo,
     DateTime? fechaNacimiento,
     String? direccion,
+    String? fotoPerfilUrl,
   }) {
     return FormularioEstudiante(
       id: id ?? this.id,
@@ -317,6 +348,7 @@ class FormularioEstudiante {
       activo: activo ?? this.activo,
       fechaNacimiento: fechaNacimiento ?? this.fechaNacimiento,
       direccion: direccion ?? this.direccion,
+      fotoPerfilUrl: fotoPerfilUrl ?? this.fotoPerfilUrl,
     );
   }
 } 

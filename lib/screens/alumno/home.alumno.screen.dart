@@ -1,6 +1,6 @@
 import 'package:aulago/models/curso.model.dart';
-import 'package:aulago/providers/alumno/home.alumno.riverpod.dart';
-import 'package:aulago/providers/auth.riverpod.dart' hide usuarioActualProvider;
+import 'package:aulago/providers/auth.riverpod.dart';
+import 'package:aulago/repositories/curso.repository.dart';
 import 'package:aulago/screens/alumno/cursos.alumno.screen.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/material.dart';
@@ -14,11 +14,7 @@ class PantallaInicioAlumno extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final estadoAuth = ref.watch(proveedorAuthProvider);
     final estudiante = ref.watch(usuarioActualProvider);
-    final cursosAsync = ref.watch(cursosEstudianteActualProvider);
-    final anunciosAsync = ref.watch(anunciosProvider);
-    final fechasAsync = ref.watch(fechasImportantesProvider);
-    ref..watch(periodosAcademicosProvider)
-    ..watch(periodoSeleccionadoProvider);
+    final cursosFuture = CursoRepository().obtenerCursos();
     final ancho = MediaQuery.of(context).size.width;
     final esMovil = ancho < 700;
 
@@ -44,15 +40,26 @@ class PantallaInicioAlumno extends ConsumerWidget {
               ),
             ),
           ),
-          cursosAsync.when(
-            data: (cursos) => _buildSeccionCursosMovil(context, cursos),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => Center(child: Text('Error: $error')),
+          FutureBuilder<List<ModeloCurso>>(
+            future: cursosFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+              final cursos = snapshot.data ?? [];
+              final cursosDetallados = cursos
+                  .map((c) => ModeloCursoDetallado(curso: c))
+                  .toList();
+               return _buildSeccionCursosMovil(context, cursosDetallados);
+            },
           ),
           const SizedBox(height: 28),
-          _construirAnunciosGrande(anunciosAsync),
+          _construirAnunciosGrande(const AsyncValue<List<Map<String, dynamic>>>.data([])),
           const SizedBox(height: 28),
-          _construirFechasImportantesGrande(fechasAsync),
+          _construirFechasImportantesGrande(const AsyncValue<List<Map<String, dynamic>>>.data([])),
         ],
       );
     }
@@ -63,13 +70,28 @@ class PantallaInicioAlumno extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          cursosAsync.when(
-            data: (cursos) => _buildSeccionCursos(context, cursos),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => Center(child: Text('Error: $error')),
+          FutureBuilder<List<ModeloCurso>>(
+            future: cursosFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+              final cursos = snapshot.data ?? [];
+              final cursosDetallados = cursos
+                  .map((c) => ModeloCursoDetallado(curso: c))
+                  .toList();
+              return _buildSeccionCursos(context, cursosDetallados);
+            },
           ),
           const SizedBox(height: 40),
-          _buildBottomSections(anunciosAsync, fechasAsync, true),
+          _buildBottomSections(
+            const AsyncValue<List<Map<String, dynamic>>>.data([]),
+            const AsyncValue<List<Map<String, dynamic>>>.data([]),
+            true,
+          ),
         ],
       ),
     );
@@ -220,10 +242,11 @@ class PantallaInicioAlumno extends ConsumerWidget {
                 width: 110,
                 child: ElevatedButton(
                   onPressed: () {
+                    // Abrir layout de cursos con el curso seleccionado
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const PantallaCursosAlumno(),
+                        builder: (context) => PantallaCursosAlumno(initialCursoId: curso.curso.id),
                       ),
                     );
                   },
@@ -625,7 +648,7 @@ class PantallaInicioAlumno extends ConsumerWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const PantallaCursosAlumno(),
+                        builder: (context) => PantallaCursosAlumno(initialCursoId: curso.curso.id),
                       ),
                     );
                   },

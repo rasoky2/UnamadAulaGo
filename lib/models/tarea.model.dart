@@ -3,34 +3,18 @@ class ModeloTarea {
 
   factory ModeloTarea.fromJson(Map<String, dynamic> json) {
     return ModeloTarea(
-      id: json['id'] as String? ?? '',
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
       titulo: json['titulo'] as String? ?? '',
       descripcion: json['descripcion'] as String?,
       instrucciones: json['instrucciones'] as String?,
-      fechaAsignacion: json['fecha_asignacion'] is String
-          ? DateTime.parse(json['fecha_asignacion'])
-          : (json['fecha_asignacion'] is DateTime
-              ? json['fecha_asignacion']
-              : null),
-      fechaEntrega: json['fecha_entrega'] is String
-          ? DateTime.parse(json['fecha_entrega'])
-          : (json['fecha_entrega'] is DateTime
-              ? json['fecha_entrega']
-              : DateTime.now().add(const Duration(days: 7))),
+      fechaAsignacion: json['fecha_asignacion'] != null ? DateTime.tryParse(json['fecha_asignacion'].toString()) : null,
+      fechaEntrega: json['fecha_entrega'] != null ? DateTime.tryParse(json['fecha_entrega'].toString()) ?? DateTime.now() : DateTime.now(),
       puntosMaximos: (json['puntos_maximos'] as num?)?.toDouble() ?? 0.0,
       estado: json['estado'] as String? ?? 'activa',
-      cursoId: json['curso_id'] as String? ?? '',
+      cursoId: json['curso_id'] is int ? json['curso_id'] : int.tryParse(json['curso_id']?.toString() ?? '') ?? 0,
       nombreCurso: json['cursos'] != null && json['cursos'] is Map<String, dynamic> ? (json['cursos']['nombre'] as String?) : null,
-      fechaCreacion: json['fecha_creacion'] is String
-          ? DateTime.tryParse(json['fecha_creacion']) ?? DateTime.now()
-          : (json['fecha_creacion'] is DateTime
-              ? json['fecha_creacion']
-              : DateTime.now()),
-      fechaActualizacion: json['fecha_actualizacion'] is String
-          ? DateTime.tryParse(json['fecha_actualizacion']) ?? DateTime.now()
-          : (json['fecha_actualizacion'] is DateTime
-              ? json['fecha_actualizacion']
-              : DateTime.now()),
+      fechaCreacion: json['fecha_creacion'] != null ? DateTime.tryParse(json['fecha_creacion'].toString()) ?? DateTime.now() : DateTime.now(),
+      fechaActualizacion: json['fecha_actualizacion'] != null ? DateTime.tryParse(json['fecha_actualizacion'].toString()) ?? DateTime.now() : DateTime.now(),
     );
   }
 
@@ -48,7 +32,7 @@ class ModeloTarea {
     required this.fechaCreacion,
     required this.fechaActualizacion,
   });
-  final String id;
+  final int id;
   final String titulo;
   final String? descripcion;
   final String? instrucciones;
@@ -56,7 +40,7 @@ class ModeloTarea {
   final DateTime fechaEntrega;
   final double puntosMaximos;
   final String estado;
-  final String cursoId;
+  final int cursoId;
   final String? nombreCurso;
   final DateTime fechaCreacion;
   final DateTime fechaActualizacion;
@@ -84,7 +68,7 @@ class ModeloTarea {
   Duration get tiempoRestante => fechaEntrega.difference(DateTime.now());
 
   ModeloTarea copyWith({
-    String? id,
+    int? id,
     String? titulo,
     String? descripcion,
     String? instrucciones,
@@ -92,7 +76,7 @@ class ModeloTarea {
     DateTime? fechaEntrega,
     double? puntosMaximos,
     String? estado,
-    String? cursoId,
+    int? cursoId,
     String? nombreCurso,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,

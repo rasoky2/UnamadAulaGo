@@ -4,10 +4,9 @@ import 'package:aulago/models/tarea.model.dart';
 import 'package:aulago/models/usuario.model.dart';
 
 class ModeloCurso {
-
   const ModeloCurso({
     required this.id,
-    this.carreraId,
+    required this.carreraId,
     required this.codigoCurso,
     required this.nombre,
     this.descripcion,
@@ -19,40 +18,41 @@ class ModeloCurso {
     this.fechaCreacion,
     this.profesorId,
     this.totalUnidades,
+    this.unidades = const [],
   });
 
   factory ModeloCurso.fromJson(Map<String, dynamic> json) {
     return ModeloCurso(
-      id: json['id'] as String,
-      carreraId: json['carrera_id'] as String?,
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      carreraId: json['carrera_id'] is int ? json['carrera_id'] : int.tryParse(json['carrera_id'].toString()) ?? 0,
       codigoCurso: json['codigo_curso'] as String,
       nombre: json['nombre'] as String,
       descripcion: json['descripcion'] as String?,
-      creditos: json['creditos'] as int?,
-      horasTeoria: json['horas_teoria'] as int?,
-      horasPractica: json['horas_practica'] as int?,
+      creditos: json['creditos'] as int? ?? 3,
+      horasTeoria: json['horas_teoria'] as int? ?? 2,
+      horasPractica: json['horas_practica'] as int? ?? 2,
       semestreRecomendado: json['semestre_recomendado'] as int?,
       esObligatorio: json['es_obligatorio'] as bool? ?? true,
-      fechaCreacion: json['fecha_creacion'] != null
-          ? DateTime.parse(json['fecha_creacion'])
-          : null,
-      profesorId: json['profesor_id'] as String?,
+      fechaCreacion: json['fecha_creacion'] != null ? DateTime.tryParse(json['fecha_creacion'].toString()) : null,
+      profesorId: json['profesor_id'] is int ? json['profesor_id'] : int.tryParse(json['profesor_id']?.toString() ?? ''),
       totalUnidades: json['total_unidades'] as int?,
+      unidades: (json['unidades'] as List<dynamic>? ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList(),
     );
   }
-  final String id;
-  final String? carreraId;
+  final int id;
+  final int carreraId;
   final String codigoCurso;
   final String nombre;
   final String? descripcion;
-  final int? creditos;
-  final int? horasTeoria;
-  final int? horasPractica;
+  final int creditos;
+  final int horasTeoria;
+  final int horasPractica;
   final int? semestreRecomendado;
   final bool esObligatorio;
   final DateTime? fechaCreacion;
-  final String? profesorId;
+  final int? profesorId;
   final int? totalUnidades;
+  final List<Map<String, dynamic>> unidades;
 
   Map<String, dynamic> toJson() {
     return {
@@ -69,6 +69,7 @@ class ModeloCurso {
       'fecha_creacion': fechaCreacion?.toIso8601String(),
       'profesor_id': profesorId,
       'total_unidades': totalUnidades,
+      'unidades': unidades,
     };
   }
 }
