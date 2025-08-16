@@ -14,18 +14,20 @@ class ExamenEntrega {
 
   factory ExamenEntrega.fromJson(Map<String, dynamic> json) {
     return ExamenEntrega(
-      id: json['id'] as int,
-      examenId: json['examen_id'] as int,
-      estudianteId: json['estudiante_id'] as int,
-      fechaInicio: DateTime.parse(json['fecha_inicio'].toString()),
+      id: json['id'] as int? ?? 0,
+      examenId: json['examen_id'] as int? ?? 0,
+      estudianteId: json['estudiante_id'] as int? ?? 0,
+      fechaInicio: json['fecha_inicio'] != null 
+          ? DateTime.parse(json['fecha_inicio'].toString())
+          : DateTime.now(),
       fechaFin: json['fecha_fin'] != null 
           ? DateTime.parse(json['fecha_fin'].toString()) 
           : null,
       calificacion: json['calificacion'] != null 
           ? (json['calificacion'] as num).toDouble() 
           : null,
-      intento: json['intento'] as int,
-      estado: json['estado'] as String,
+      intento: json['intento'] as int? ?? 1,
+      estado: json['estado'] as String? ?? 'no_iniciado',
       respuestas: json['respuestas'] != null
           ? (json['respuestas'] as List<dynamic>)
               .map((r) => RespuestaExamen.fromJson(r as Map<String, dynamic>))
@@ -120,8 +122,8 @@ class RespuestaExamen {
 
   factory RespuestaExamen.fromJson(Map<String, dynamic> json) {
     return RespuestaExamen(
-      preguntaId: json['pregunta_id'] as int,
-      respuestaDada: json['respuesta_dada'] as String,
+      preguntaId: json['pregunta_id'] as int? ?? 0,
+      respuestaDada: json['respuesta_dada'] as String? ?? 'Sin respuesta',
       esCorrecta: json['es_correcta'] as bool?,
       puntosObtenidos: json['puntos_obtenidos'] != null 
           ? (json['puntos_obtenidos'] as num).toDouble() 

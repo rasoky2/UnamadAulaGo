@@ -34,13 +34,35 @@ class _ExamenesTabState extends ConsumerState<ExamenesTab> {
     _cargarExamenes();
   }
 
+  @override
+  void didUpdateWidget(ExamenesTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Si cambió el cursoId, recargar los exámenes
+    if (oldWidget.cursoId != widget.cursoId) {
+      _cargarExamenes();
+    }
+  }
+
   void _cargarExamenes() {
+    debugPrint('[ExamenesTab] Cargando exámenes para curso: ${widget.cursoId}');
+    
+    // Validar que el cursoId sea válido
+    final cursoIdInt = int.tryParse(widget.cursoId);
+    if (cursoIdInt == null) {
+      debugPrint('[ExamenesTab] Error: cursoId inválido: ${widget.cursoId}');
+      return;
+    }
+    
     final examenRepo = ExamenRepository();
     setState(() {
-      _futureExamenes = examenRepo
-          .obtenerExamenes()
-          .then((lista) => lista.where((e) => e.cursoId?.toString() == widget.cursoId).toList());
+      _futureExamenes = examenRepo.obtenerExamenesPorCurso(cursoIdInt);
     });
+  }
+
+  /// Refresca manualmente los exámenes
+  Future<void> _refrescarExamenes() async {
+    debugPrint('[ExamenesTab] Refrescando exámenes para curso: ${widget.cursoId}');
+    _cargarExamenes();
   }
 
   Future<void> _mostrarDialogoCrearExamen() async {
@@ -92,20 +114,116 @@ class _ExamenesTabState extends ConsumerState<ExamenesTab> {
     );
   }
 
+  /// Muestra el modal con los puntajes del examen
+  void _mostrarPuntajesModal(BuildContext context, ModeloExamen examen) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: _PuntajesExamenWidget(
+            examen: examen,
+            scrollController: scrollController,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Exámenes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text('Crear Examen'),
-                onPressed: _mostrarDialogoCrearExamen,
+              Row(
+                children: [
+                  const Text('Exámenes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  // Botón de refresh
+                  IconButton(
+                    onPressed: _refrescarExamenes,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Refrescar exámenes',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.grey.shade100,
+                      foregroundColor: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('Crear Examen'),
+                    onPressed: _mostrarDialogoCrearExamen,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.school, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Curso ID: ${widget.cursoId}',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Indicador de estado
+                  FutureBuilder<List<ModeloExamen>>(
+                    future: _futureExamenes,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade600),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Cargando...',
+                              style: TextStyle(
+                                color: Colors.blue.shade600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      if (snapshot.hasData) {
+                        final examenes = snapshot.data!;
+                        return Text(
+                          '${examenes.length} examen${examenes.length == 1 ? '' : 'es'}',
+                          style: TextStyle(
+                            color: Colors.green.shade600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -118,34 +236,177 @@ class _ExamenesTabState extends ConsumerState<ExamenesTab> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error al cargar exámenes',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Curso ID: ${widget.cursoId}',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        snapshot.error.toString(),
+                        style: TextStyle(color: Colors.grey.shade500),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _refrescarExamenes,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Reintentar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
               }
               final examenes = snapshot.data ?? [];
               if (examenes.isEmpty) {
-                return const Center(child: Text('No hay exámenes creados para este curso.'));
-              }
-              return ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: examenes.length,
-                itemBuilder: (context, index) {
-                  final examen = examenes[index];
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: ListTile(
-                      leading: const Icon(Icons.assignment_turned_in),
-                      title: Text(examen.titulo),
-                      subtitle: Text('Disponible: ${examen.fechaDisponible} - Límite: ${examen.fechaLimite}\nDuración: ${examen.fechaLimite.difference(examen.fechaDisponible).inMinutes} min'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () {
-                          _mostrarDialogoEditarExamen(examen);
-                        },
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.assignment_turned_in, size: 64, color: Colors.grey.shade300),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No hay exámenes para este curso',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
-                      onTap: () => _mostrarEntregasModal(context, examen),
-                    ),
-                  );
-                },
-              );
+                      const SizedBox(height: 8),
+                      Text(
+                        'Curso ID: ${widget.cursoId}',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _mostrarDialogoCrearExamen,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Crear Primer Examen'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return RefreshIndicator(
+                  onRefresh: _refrescarExamenes,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: examenes.length,
+                    itemBuilder: (context, index) {
+                      final examen = examenes[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.assignment_turned_in, color: Colors.blue),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          examen.titulo,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Disponible: ${examen.fechaDisponible} - Límite: ${examen.fechaLimite}',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Duración: ${examen.fechaLimite.difference(examen.fechaDisponible).inMinutes} min',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, color: Colors.orange),
+                                    onPressed: () {
+                                      _mostrarDialogoEditarExamen(examen);
+                                    },
+                                    tooltip: 'Editar examen',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => _mostrarEntregasModal(context, examen),
+                                      icon: const Icon(Icons.people, size: 18),
+                                      label: const Text('Ver Entregas'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue.shade600,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => _mostrarPuntajesModal(context, examen),
+                                      icon: const Icon(Icons.score, size: 18),
+                                      label: const Text('Ver Puntajes'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green.shade600,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
             },
           ),
         ),
@@ -193,6 +454,7 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
   // Estado
   int _pasoActual = 0;
   bool _isLoading = false;
+  bool _cargandoPreguntas = false;
 
   @override
   void initState() {
@@ -207,8 +469,13 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
       _puntosMaximos = widget.examen!.puntosMaximos;
       _tipoExamen = widget.examen!.tipoExamen;
       _aleatorizarPreguntas = widget.examen!.aleatorizarPreguntas;
+      
+      // Cargar preguntas existentes del examen de forma asíncrona
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _cargarPreguntasExistentes();
+      });
     } else {
-      // Agregar una pregunta inicial
+      // Agregar una pregunta inicial para nuevo examen
       _agregarPregunta();
     }
   }
@@ -237,6 +504,37 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
         _preguntas[index].dispose();
         _preguntas.removeAt(index);
       });
+    }
+  }
+
+  /// Carga las preguntas existentes del examen que se está editando
+  Future<void> _cargarPreguntasExistentes() async {
+    if (widget.examen == null) return;
+    
+    setState(() {
+      _cargandoPreguntas = true;
+    });
+    
+    try {
+      final repo = ExamenRepository();
+      final preguntasExistentes = await repo.obtenerPreguntasExamen(widget.examen!.id);
+      
+      setState(() {
+        _preguntas.clear();
+        for (final pregunta in preguntasExistentes) {
+          _preguntas.add(PreguntaTemporal.fromPreguntaExamen(pregunta));
+        }
+        _cargandoPreguntas = false;
+      });
+      
+      debugPrint('[EditarExamen] Preguntas cargadas: ${_preguntas.length}');
+    } catch (e) {
+      debugPrint('[EditarExamen] Error al cargar preguntas: $e');
+      setState(() {
+        _cargandoPreguntas = false;
+      });
+      // Si falla la carga, agregar una pregunta por defecto
+      _agregarPregunta();
     }
   }
 
@@ -303,46 +601,93 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
     try {
       final repo = ExamenRepository();
       
-      // Crear el examen
-      final examen = ModeloExamen(
-        id: 0,
-        titulo: _tituloController.text,
-        descripcion: _descripcionController.text,
-        instrucciones: _instruccionesController.text,
-        fechaDisponible: _fechaInicio!,
-        fechaLimite: _fechaFin!,
-        duracionMinutos: _duracion,
-        puntosMaximos: _puntosMaximos,
-        tipoExamen: _tipoExamen,
-        aleatorizarPreguntas: _aleatorizarPreguntas,
-        estado: 'publicado',
-        fechaCreacion: DateTime.now(),
-        cursoId: int.tryParse(widget.cursoId),
-        fechaActualizacion: DateTime.now(),
-      );
-
-      // Convertir preguntas temporales a preguntas del modelo
-      final preguntas = _preguntas.map((p) => p.toPreguntaExamen()).toList();
-
-      // Crear examen con preguntas
-      await repo.crearExamenConPreguntas(
-        examen: examen,
-        preguntas: preguntas,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Examen creado exitosamente'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
+      if (widget.examen != null) {
+        // EDITAR EXAMEN EXISTENTE
+        debugPrint('[EditarExamen] Editando examen ID: ${widget.examen!.id}');
+        
+        // Actualizar datos del examen
+        final examenActualizado = ModeloExamen(
+          id: widget.examen!.id,
+          titulo: _tituloController.text,
+          descripcion: _descripcionController.text,
+          instrucciones: _instruccionesController.text,
+          fechaDisponible: _fechaInicio!,
+          fechaLimite: _fechaFin!,
+          duracionMinutos: _duracion,
+          puntosMaximos: _puntosMaximos,
+          tipoExamen: _tipoExamen,
+          aleatorizarPreguntas: _aleatorizarPreguntas,
+          estado: widget.examen!.estado, // Mantener estado actual
+          fechaCreacion: widget.examen!.fechaCreacion, // Mantener fecha de creación
+          cursoId: widget.examen!.cursoId, // Mantener curso ID
+          fechaActualizacion: DateTime.now(),
         );
-        Navigator.of(context).pop(true);
+
+        // Convertir preguntas temporales a preguntas del modelo
+        final preguntas = _preguntas.map((p) => p.toPreguntaExamen()).toList();
+
+        // Actualizar examen con preguntas
+        await repo.actualizarExamenConPreguntas(
+          examen: examenActualizado,
+          preguntas: preguntas,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Examen actualizado exitosamente'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        // CREAR NUEVO EXAMEN
+        debugPrint('[CrearExamen] Creando nuevo examen');
+        
+        // Crear el examen
+        final examen = ModeloExamen(
+          id: 0,
+          titulo: _tituloController.text,
+          descripcion: _descripcionController.text,
+          instrucciones: _instruccionesController.text,
+          fechaDisponible: _fechaInicio!,
+          fechaLimite: _fechaFin!,
+          duracionMinutos: _duracion,
+          puntosMaximos: _puntosMaximos,
+          tipoExamen: _tipoExamen,
+          aleatorizarPreguntas: _aleatorizarPreguntas,
+          estado: 'publicado',
+          fechaCreacion: DateTime.now(),
+          cursoId: int.tryParse(widget.cursoId),
+          fechaActualizacion: DateTime.now(),
+        );
+
+        // Convertir preguntas temporales a preguntas del modelo
+        final preguntas = _preguntas.map((p) => p.toPreguntaExamen()).toList();
+
+        // Crear examen con preguntas
+        await repo.crearExamenConPreguntas(
+          examen: examen,
+          preguntas: preguntas,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Examen creado exitosamente'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e) {
       if (mounted) {
-        _mostrarError('Error al crear examen: $e');
+        final accion = widget.examen != null ? 'actualizar' : 'crear';
+        _mostrarError('Error al $accion examen: $e');
       }
     } finally {
       if (mounted) {
@@ -468,7 +813,9 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : Text(_pasoActual == 2 ? 'Crear Examen' : 'Siguiente'),
+                        : Text(_pasoActual == 2 
+                            ? (widget.examen != null ? 'Actualizar Examen' : 'Crear Examen')
+                            : 'Siguiente'),
                   ),
                 ),
               ],
@@ -694,17 +1041,28 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
 
         // Lista de preguntas
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _preguntas.length,
-            itemBuilder: (context, index) {
-              return PreguntaCard(
-                pregunta: _preguntas[index],
-                numero: index + 1,
-                onEliminar: _preguntas.length > 1 ? () => _eliminarPregunta(index) : null,
-              );
-            },
-          ),
+          child: _cargandoPreguntas
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Cargando preguntas existentes...'),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _preguntas.length,
+                  itemBuilder: (context, index) {
+                    return PreguntaCard(
+                      pregunta: _preguntas[index],
+                      numero: index + 1,
+                      onEliminar: _preguntas.length > 1 ? () => _eliminarPregunta(index) : null,
+                    );
+                  },
+                ),
         ),
 
         // Resumen
@@ -941,7 +1299,7 @@ class _EntregasExamenWidgetState extends ConsumerState<_EntregasExamenWidget> {
                     Expanded(
                       child: _EstadisticaCard(
                         titulo: 'Total',
-                        valor: '${stats['total_entregas']}',
+                        valor: '${stats['total_entregas'] ?? 0}',
                         icono: LucideIcons.users,
                         color: Colors.blue,
                       ),
@@ -950,7 +1308,7 @@ class _EntregasExamenWidgetState extends ConsumerState<_EntregasExamenWidget> {
                     Expanded(
                       child: _EstadisticaCard(
                         titulo: 'Completadas',
-                        valor: '${stats['completadas']}',
+                        valor: '${stats['completadas'] ?? 0}',
                         icono: LucideIcons.check,
                         color: Colors.green,
                       ),
@@ -959,7 +1317,7 @@ class _EntregasExamenWidgetState extends ConsumerState<_EntregasExamenWidget> {
                     Expanded(
                       child: _EstadisticaCard(
                         titulo: 'Promedio',
-                        valor: '${stats['promedio_calificacion'].toStringAsFixed(1)}',
+                        valor: '${(stats['promedio_calificacion'] ?? 0.0).toStringAsFixed(1)}',
                         icono: LucideIcons.trendingUp,
                         color: Colors.orange,
                       ),
@@ -968,7 +1326,7 @@ class _EntregasExamenWidgetState extends ConsumerState<_EntregasExamenWidget> {
                     Expanded(
                       child: _EstadisticaCard(
                         titulo: 'Aprobación',
-                        valor: '${stats['porcentaje_aprobacion'].toStringAsFixed(0)}%',
+                        valor: '${(stats['porcentaje_aprobacion'] ?? 0.0).toStringAsFixed(0)}%',
                         icono: LucideIcons.award,
                         color: Colors.purple,
                       ),
@@ -1173,7 +1531,7 @@ class _EntregaExamenCard extends StatelessWidget {
                 children: [
                   AvatarWidget(
                     fotoUrl: estudiante['foto_perfil_url'],
-                    nombreCompleto: estudiante['nombre_completo'],
+                    nombreCompleto: estudiante['nombre_completo'] ?? 'Estudiante',
                     tipoUsuario: 'estudiante',
                     radio: 24,
                   ),
@@ -1183,14 +1541,14 @@ class _EntregaExamenCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          estudiante['nombre_completo'],
+                          estudiante['nombre_completo'] ?? 'Estudiante sin nombre',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
                         Text(
-                          estudiante['codigo_estudiante'],
+                          estudiante['codigo_estudiante'] ?? 'Sin código',
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 14,
@@ -1310,14 +1668,14 @@ class _DetalleEntregaWidget extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          estudiante['nombre_completo'],
+                          estudiante['nombre_completo'] ?? 'Estudiante sin nombre',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          'Código: ${estudiante['codigo_estudiante']}',
+                          'Código: ${estudiante['codigo_estudiante'] ?? 'Sin código'}',
                           style: TextStyle(color: Colors.grey.shade600),
                         ),
                       ],
@@ -1609,5 +1967,434 @@ class _PreguntaRespuestaCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ==================== WIDGET DE PUNTAJES DEL EXAMEN ====================
+
+class _PuntajesExamenWidget extends ConsumerStatefulWidget {
+  const _PuntajesExamenWidget({
+    required this.examen,
+    required this.scrollController,
+  });
+
+  final ModeloExamen examen;
+  final ScrollController scrollController;
+
+  @override
+  ConsumerState<_PuntajesExamenWidget> createState() => _PuntajesExamenWidgetState();
+}
+
+class _PuntajesExamenWidgetState extends ConsumerState<_PuntajesExamenWidget> {
+  final ExamenEntregaRepository _entregaRepo = ExamenEntregaRepository();
+  late Future<List<Map<String, dynamic>>> _futureEntregas;
+  late Future<Map<String, dynamic>> _futureEstadisticas;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
+  }
+
+  void _cargarDatos() {
+    _futureEntregas = _entregaRepo.obtenerEntregasConEstudiante(widget.examen.id);
+    _futureEstadisticas = _entregaRepo.obtenerEstadisticasExamen(widget.examen.id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Header del modal
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.score, color: Colors.green, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Puntajes - ${widget.examen.titulo}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Puntos máximos: ${widget.examen.puntosMaximos}',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+
+        // Estadísticas del examen
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: FutureBuilder<Map<String, dynamic>>(
+            future: _futureEstadisticas,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final stats = snapshot.data!;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _EstadisticaPuntajeCard(
+                        titulo: 'Total',
+                        valor: '${stats['total_entregas'] ?? 0}',
+                        icono: Icons.people,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _EstadisticaPuntajeCard(
+                        titulo: 'Completadas',
+                        valor: '${stats['completadas'] ?? 0}',
+                        icono: Icons.check_circle,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _EstadisticaPuntajeCard(
+                        titulo: 'Promedio',
+                        valor: '${(stats['promedio_calificacion'] ?? 0.0).toStringAsFixed(1)}',
+                        icono: Icons.trending_up,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _EstadisticaPuntajeCard(
+                        titulo: 'Aprobación',
+                        valor: '${(stats['porcentaje_aprobacion'] ?? 0.0).toStringAsFixed(0)}%',
+                        icono: Icons.school,
+                        color: Colors.purple,
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return const SizedBox(height: 80);
+            },
+          ),
+        ),
+
+        // Lista de puntajes
+        Expanded(
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _futureEntregas,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error al cargar puntajes',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        snapshot.error.toString(),
+                        style: TextStyle(color: Colors.grey.shade500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final entregas = snapshot.data ?? [];
+
+              if (entregas.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.assignment_turned_in, size: 64, color: Colors.grey.shade300),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No hay entregas para este examen',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Los puntajes aparecerán cuando los estudiantes completen el examen',
+                        style: TextStyle(color: Colors.grey.shade500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // Ordenar entregas por calificación (de mayor a menor)
+              entregas.sort((a, b) {
+                final calA = a['calificacion'] ?? 0.0;
+                final calB = b['calificacion'] ?? 0.0;
+                return calB.compareTo(calA);
+              });
+
+              return RefreshIndicator(
+                onRefresh: () async => _cargarDatos(),
+                child: ListView.builder(
+                  controller: widget.scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: entregas.length,
+                  itemBuilder: (context, index) {
+                    final entregaData = entregas[index];
+                    final entrega = ExamenEntrega.fromJson(entregaData);
+                    final estudiante = entregaData['estudiantes'];
+                    final posicion = index + 1;
+
+                    return _PuntajeAlumnoCard(
+                      entrega: entrega,
+                      estudiante: estudiante,
+                      posicion: posicion,
+                      examen: widget.examen,
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EstadisticaPuntajeCard extends StatelessWidget {
+  const _EstadisticaPuntajeCard({
+    required this.titulo,
+    required this.valor,
+    required this.icono,
+    required this.color,
+  });
+
+  final String titulo;
+  final String valor;
+  final IconData icono;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icono, color: color, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            valor,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            titulo,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PuntajeAlumnoCard extends StatelessWidget {
+  const _PuntajeAlumnoCard({
+    required this.entrega,
+    required this.estudiante,
+    required this.posicion,
+    required this.examen,
+  });
+
+  final ExamenEntrega entrega;
+  final Map<String, dynamic> estudiante;
+  final int posicion;
+  final ModeloExamen examen;
+
+  @override
+  Widget build(BuildContext context) {
+    final calificacion = entrega.calificacion ?? 0.0;
+    final porcentaje = entrega.porcentajeCalificacion(examen.puntosMaximos);
+    final esAprobado = calificacion >= 11;
+    final colorCalificacion = esAprobado ? Colors.green : Colors.red;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Posición
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _getColorPosicion(posicion),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Center(
+                child: Text(
+                  '$posicion',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Información del estudiante
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    estudiante['nombre_completo'] ?? 'Estudiante sin nombre',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    estudiante['codigo_estudiante'] ?? 'Sin código',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (entrega.duracionMinutos != null) ...[
+                    const SizedBox(height: 4),
+                                         Row(
+                       children: [
+                         Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                         const SizedBox(width: 4),
+                         Text(
+                           'Duración: ${entrega.duracionMinutos}min',
+                           style: TextStyle(
+                             color: Colors.grey.shade600,
+                             fontSize: 12,
+                           ),
+                         ),
+                       ],
+                     ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Calificación
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: colorCalificacion,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${calificacion.toStringAsFixed(1)}/${examen.puntosMaximos}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                if (porcentaje != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${porcentaje.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: colorCalificacion,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorCalificacion.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colorCalificacion.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    esAprobado ? 'APROBADO' : 'REPROBADO',
+                    style: TextStyle(
+                      color: colorCalificacion,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getColorPosicion(int posicion) {
+    switch (posicion) {
+      case 1:
+        return Colors.amber.shade600; // Oro
+      case 2:
+        return Colors.grey.shade400; // Plata
+      case 3:
+        return Colors.orange.shade600; // Bronce
+      default:
+        return Colors.blue.shade600; // Azul para el resto
+    }
   }
 }

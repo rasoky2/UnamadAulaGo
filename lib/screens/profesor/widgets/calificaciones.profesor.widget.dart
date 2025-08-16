@@ -57,10 +57,9 @@ final evaluacionesCursoProvider = FutureProvider.family<List<EvaluacionData>, in
   }
   
   // Obtener exámenes del curso
-  final examenes = await examenRepo.obtenerExamenes();
-  final examenesDelCurso = examenes.where((e) => e.cursoId == cursoId).toList();
+  final examenes = await examenRepo.obtenerExamenesPorCurso(cursoId);
   
-  for (final examen in examenesDelCurso) {
+  for (final examen in examenes) {
     evaluaciones.add(EvaluacionData(
       id: examen.id.toString(),
       titulo: examen.titulo,
@@ -76,10 +75,14 @@ final evaluacionesCursoProvider = FutureProvider.family<List<EvaluacionData>, in
   return evaluaciones;
 });
 
-final calificacionesCursoProvider = FutureProvider.family<List<Calificacion>, int>((ref, cursoId) async {
+final calificacionesCursoProvider = FutureProvider.family<List<CalificacionUnificada>, int>((ref, cursoId) async {
   final repo = CalificacionRepository();
-  final calificaciones = await repo.obtenerCalificaciones();
-  return calificaciones.where((c) => c.cursoId == cursoId).toList();
+  
+  // Primero sincronizar para asegurar que todas las calificaciones estén en la tabla
+  await repo.sincronizarCalificaciones(cursoId);
+  
+  // Luego obtener las calificaciones unificadas
+  return repo.obtenerCalificacionesUnificadasPorCurso(cursoId);
 });
 
 class CalificacionesTab extends ConsumerStatefulWidget {
@@ -179,11 +182,11 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     BuildContext context,
     List<EstudianteAdmin> estudiantes,
     List<EvaluacionData> evaluaciones,
-    List<Calificacion> calificaciones,
+    List<CalificacionUnificada> calificaciones,
     bool esMovil,
   ) {
     // --- Crear mapa de calificaciones ---
-    final mapaCalificaciones = <String, Calificacion>{};
+    final mapaCalificaciones = <String, CalificacionUnificada>{};
     for (final calificacion in calificaciones) {
       final key = calificacion.tareaId != null 
           ? '${calificacion.estudianteId}-${calificacion.tareaId}'
@@ -253,33 +256,79 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
         // --- Dashboard resumen ---
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 8,
+          child: Column(
             children: [
-              _InfoBox(
-                icon: LucideIcons.graduationCap,
-                label: 'Promedio general',
-                value: promedioGeneral.toStringAsFixed(2),
-                color: Colors.blue,
+              // Botón de sincronización
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final cursoIdInt = int.tryParse(widget.cursoId) ?? 0;
+                      final repo = CalificacionRepository();
+                      await repo.sincronizarCalificaciones(cursoIdInt);
+                      
+                      // Refrescar todos los providers
+                      ref.invalidate(calificacionesCursoProvider(cursoIdInt));
+                      
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Calificaciones sincronizadas correctamente'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error al sincronizar: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.sync),
+                  label: const Text('Sincronizar Calificaciones'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
               ),
-              _InfoBox(
-                icon: LucideIcons.check,
-                label: 'Aprobados',
-                value: '$totalAprobados',
-                color: Colors.green,
-              ),
-              _InfoBox(
-                icon: LucideIcons.x,
-                label: 'Reprobados',
-                value: '$totalReprobados',
-                color: Colors.red,
-              ),
-              _InfoBox(
-                icon: LucideIcons.clock,
-                label: 'Pendientes',
-                value: '$totalPendientes',
-                color: Colors.orange,
+              const SizedBox(height: 16),
+              // Dashboard existente
+              Wrap(
+                spacing: 16,
+                runSpacing: 8,
+                children: [
+                  _InfoBox(
+                    icon: LucideIcons.graduationCap,
+                    label: 'Promedio general',
+                    value: promedioGeneral.toStringAsFixed(2),
+                    color: Colors.blue,
+                  ),
+                  _InfoBox(
+                    icon: LucideIcons.check,
+                    label: 'Aprobados',
+                    value: '$totalAprobados',
+                    color: Colors.green,
+                  ),
+                  _InfoBox(
+                    icon: LucideIcons.x,
+                    label: 'Reprobados',
+                    value: '$totalReprobados',
+                    color: Colors.red,
+                  ),
+                  _InfoBox(
+                    icon: LucideIcons.clock,
+                    label: 'Pendientes',
+                    value: '$totalPendientes',
+                    color: Colors.orange,
+                  ),
+                ],
               ),
             ],
           ),
@@ -422,7 +471,7 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
   double? _calcularPromedioEstudiante(
     EstudianteAdmin estudiante, 
     List<EvaluacionData> evaluaciones, 
-    Map<String, Calificacion> mapaCalificaciones
+    Map<String, CalificacionUnificada> mapaCalificaciones
   ) {
     double suma = 0;
     int cuenta = 0;
@@ -449,7 +498,7 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     BuildContext context, 
     EstudianteAdmin estudiante, 
     String evalId, 
-    Calificacion? calificacionExistente, 
+    CalificacionUnificada? calificacionExistente, 
     EvaluacionData evaluacion
   ) async {
     final puntosController = TextEditingController(
@@ -584,7 +633,7 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     EstudianteAdmin estudiante,
     EvaluacionData evaluacion,
     double puntosObtenidos,
-    Calificacion? calificacionExistente,
+    CalificacionUnificada? calificacionExistente,
   ) async {
     try {
       final repo = CalificacionRepository();
@@ -643,10 +692,15 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     }
   }
 
-  Future<void> _eliminarCalificacion(Calificacion calificacion) async {
+  Future<void> _eliminarCalificacion(CalificacionUnificada calificacion) async {
     try {
       final repo = CalificacionRepository();
-      await repo.eliminarCalificacion(calificacion.id);
+      
+      // Si la calificación viene de una entrega, no la eliminamos de la tabla
+      // Solo si viene de la tabla de calificaciones
+      if (calificacion.fuente == 'tabla_calificaciones') {
+        await repo.eliminarCalificacion(calificacion.id);
+      }
       
       // Refrescar datos
       final cursoIdInt = int.tryParse(widget.cursoId) ?? 0;
@@ -656,9 +710,8 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Calificación eliminada correctamente'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
+            content: Text('Calificación eliminada correctamente'), 
+            backgroundColor: Colors.orange
           ),
         );
       }
@@ -666,9 +719,8 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al eliminar la calificación: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
+            content: Text('Error al eliminar la calificación: $e'), 
+            backgroundColor: Colors.red
           ),
         );
       }
@@ -720,7 +772,7 @@ class _InfoBox extends StatelessWidget {
 
 class _NotaCell extends StatelessWidget {
   const _NotaCell({required this.calificacion, required this.puntosMaximos});
-  final Calificacion? calificacion;
+  final CalificacionUnificada? calificacion;
   final double puntosMaximos;
 
   @override
@@ -774,7 +826,7 @@ class _NotaCell extends StatelessWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties..add(DiagnosticsProperty<Calificacion?>('calificacion', calificacion))
+    properties..add(DiagnosticsProperty<CalificacionUnificada?>('calificacion', calificacion))
     ..add(DoubleProperty('puntosMaximos', puntosMaximos));
   }
 }
@@ -789,8 +841,8 @@ class _EstudianteCard extends StatelessWidget {
   
   final EstudianteAdmin estudiante;
   final List<EvaluacionData> evaluaciones;
-  final Map<String, Calificacion> mapaCalificaciones;
-  final void Function(String evalId, Calificacion? calificacion, EvaluacionData eval) onEditarNota;
+  final Map<String, CalificacionUnificada> mapaCalificaciones;
+  final void Function(String evalId, CalificacionUnificada? calificacion, EvaluacionData eval) onEditarNota;
 
   @override
   Widget build(BuildContext context) {
@@ -913,7 +965,7 @@ class _EstudianteCard extends StatelessWidget {
     );
   }
 
-  Color _getCellColor(Calificacion? calificacion) {
+  Color _getCellColor(CalificacionUnificada? calificacion) {
     if (calificacion == null) {
       return Colors.grey.shade50;
     }
@@ -926,7 +978,7 @@ class _EstudianteCard extends StatelessWidget {
     }
   }
 
-  Color _getBorderColor(Calificacion? calificacion) {
+  Color _getBorderColor(CalificacionUnificada? calificacion) {
     if (calificacion == null) {
       return Colors.grey.shade200;
     }
@@ -944,8 +996,8 @@ class _EstudianteCard extends StatelessWidget {
     super.debugFillProperties(properties);
     properties..add(DiagnosticsProperty('estudiante', estudiante))
     ..add(IterableProperty<EvaluacionData>('evaluaciones', evaluaciones))
-    ..add(DiagnosticsProperty<Map<String, Calificacion>>('mapaCalificaciones', mapaCalificaciones))
-    ..add(ObjectFlagProperty<void Function(String evalId, Calificacion? calificacion, EvaluacionData eval)>.has('onEditarNota', onEditarNota));
+    ..add(DiagnosticsProperty<Map<String, CalificacionUnificada>>('mapaCalificaciones', mapaCalificaciones))
+    ..add(ObjectFlagProperty<void Function(String evalId, CalificacionUnificada? calificacion, EvaluacionData eval)>.has('onEditarNota', onEditarNota));
   }
 } 
 

@@ -48,6 +48,26 @@ class ExamenRepository extends BaseRepository<ModeloExamen> {
     return true;
   }
 
+  /// Obtiene exámenes por curso específico
+  Future<List<ModeloExamen>> obtenerExamenesPorCurso(int cursoId) async {
+    try {
+      debugPrint('[$repositoryName] Obteniendo exámenes para curso: $cursoId');
+      
+      final response = await supabase
+          .from(tableName)
+          .select()
+          .eq('curso_id', cursoId)
+          .order('fecha_creacion', ascending: false);
+
+      final examenes = response.map(fromJson).toList();
+      debugPrint('[$repositoryName] Exámenes obtenidos para curso $cursoId: ${examenes.length}');
+      return examenes;
+    } catch (e) {
+      debugPrint('[$repositoryName] Error al obtener exámenes por curso: $e');
+      rethrow;
+    }
+  }
+
   // ==================== MÉTODOS PARA PREGUNTAS ====================
 
   /// Crea un examen completo con sus preguntas
@@ -71,6 +91,34 @@ class ExamenRepository extends BaseRepository<ModeloExamen> {
       return examenCreado;
     } catch (e) {
       debugPrint('[$repositoryName] Error al crear examen con preguntas: $e');
+      rethrow;
+    }
+  }
+
+  /// Actualiza un examen completo con sus preguntas
+  Future<ModeloExamen> actualizarExamenConPreguntas({
+    required ModeloExamen examen,
+    required List<PreguntaExamen> preguntas,
+  }) async {
+    try {
+      debugPrint('[$repositoryName] Actualizando examen ID: ${examen.id} con ${preguntas.length} preguntas');
+      
+      // 1. Actualizar el examen
+      final examenActualizado = await actualizarExamen(examen.id, examen);
+      
+      // 2. Eliminar preguntas existentes
+      await eliminarPreguntasExamen(examen.id);
+      
+      // 3. Crear las nuevas preguntas
+      for (final pregunta in preguntas) {
+        final preguntaParaCrear = pregunta.copyWith(examenId: examen.id);
+        await _crearPregunta(preguntaParaCrear);
+      }
+      
+      debugPrint('[$repositoryName] Examen actualizado exitosamente con ID: ${examen.id}');
+      return examenActualizado;
+    } catch (e) {
+      debugPrint('[$repositoryName] Error al actualizar examen con preguntas: $e');
       rethrow;
     }
   }

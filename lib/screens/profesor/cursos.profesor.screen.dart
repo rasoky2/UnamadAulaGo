@@ -45,8 +45,7 @@ final tareasCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) 
 final examenesCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
   try {
     final repo = ExamenRepository();
-    final todosExamenes = await repo.obtenerExamenes();
-    final examenesCurso = todosExamenes.where((e) => e.cursoId == cursoId).toList();
+    final examenesCurso = await repo.obtenerExamenesPorCurso(cursoId);
     return examenesCurso.length;
   } catch (e) {
     if (kDebugMode) {

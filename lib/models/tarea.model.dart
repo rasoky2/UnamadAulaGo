@@ -56,9 +56,21 @@ class ModeloTarea {
       'puntos_maximos': puntosMaximos,
       'estado': estado,
       'curso_id': cursoId,
-      'nombre_curso': nombreCurso,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion.toIso8601String(),
+    };
+  }
+
+  /// Método para enviar solo los campos editables (sin ID ni fechas automáticas)
+  Map<String, dynamic> toJsonEditable() {
+    return {
+      'titulo': titulo,
+      'descripcion': descripcion,
+      'instrucciones': instrucciones,
+      'fecha_entrega': fechaEntrega.toIso8601String(),
+      'puntos_maximos': puntosMaximos,
+      'estado': estado,
+      'curso_id': cursoId,
     };
   }
 
