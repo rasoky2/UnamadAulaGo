@@ -14,63 +14,105 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 export 'package:aulago/screens/profesor/widgets/tareas.profesor.widget.dart'
     show TareasTab;
 
-final estudiantesCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
+// ==================== PROVIDERS OPTIMIZADOS ====================
+
+/// Provider que obtiene todas las estadísticas del curso en una sola consulta
+final cursoStatsProvider = FutureProvider.family<Map<String, int>, int>((ref, cursoId) async {
+  try {
+    // Ejecutar todas las consultas en paralelo para mayor velocidad
+    final futures = await Future.wait([
+      _obtenerEstudiantesCount(cursoId),
+      _obtenerTareasCount(cursoId),
+      _obtenerExamenesCount(cursoId),
+      _obtenerUnidadesCount(cursoId),
+    ]);
+    
+    return {
+      'estudiantes': futures[0],
+      'tareas': futures[1],
+      'examenes': futures[2],
+      'unidades': futures[3],
+    };
+  } catch (e) {
+    if (kDebugMode) {
+      print('Error obteniendo estadísticas del curso $cursoId: $e');
+    }
+    return {
+      'estudiantes': 0,
+      'tareas': 0,
+      'examenes': 0,
+      'unidades': 0,
+    };
+  }
+});
+
+/// Función auxiliar para obtener conteo de estudiantes
+Future<int> _obtenerEstudiantesCount(int cursoId) async {
   try {
     final repo = MatriculaRepository();
     final todasMatriculas = await repo.obtenerMatriculas();
-    final matriculasCurso = todasMatriculas.where((m) => m.cursoId == cursoId).toList();
-    return matriculasCurso.length;
+    return todasMatriculas.where((m) => m.cursoId == cursoId).length;
   } catch (e) {
-    if (kDebugMode) {
-      print('Error obteniendo estudiantes del curso $cursoId: $e');
-    }
     return 0;
   }
-});
+}
 
-final tareasCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
+/// Función auxiliar para obtener conteo de tareas
+Future<int> _obtenerTareasCount(int cursoId) async {
   try {
     final repo = TareaRepository();
     final todasTareas = await repo.obtenerTareas();
-    final tareasCurso = todasTareas.where((t) => t.cursoId == cursoId).toList();
-    return tareasCurso.length;
+    return todasTareas.where((t) => t.cursoId == cursoId).length;
   } catch (e) {
-    if (kDebugMode) {
-      print('Error obteniendo tareas del curso $cursoId: $e');
-    }
     return 0;
   }
-});
+}
 
-final examenesCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
+/// Función auxiliar para obtener conteo de exámenes
+Future<int> _obtenerExamenesCount(int cursoId) async {
   try {
     final repo = ExamenRepository();
     final examenesCurso = await repo.obtenerExamenesPorCurso(cursoId);
     return examenesCurso.length;
   } catch (e) {
-    if (kDebugMode) {
-      print('Error obteniendo exámenes del curso $cursoId: $e');
-    }
     return 0;
   }
-});
+}
 
-final unidadesCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
+/// Función auxiliar para obtener conteo de unidades
+Future<int> _obtenerUnidadesCount(int cursoId) async {
   try {
-    // Crear una instancia temporal de BaseRepository para acceder al cliente
-    final tempRepo = TareaRepository(); // Usamos TareaRepository como base
+    final tempRepo = TareaRepository();
     final response = await tempRepo.supabase
         .from('unidades_curso')
         .select('id')
         .eq('curso_id', cursoId);
-    
     return response.length;
   } catch (e) {
-    if (kDebugMode) {
-      print('Error obteniendo unidades del curso $cursoId: $e');
-    }
     return 0;
   }
+}
+
+// ==================== PROVIDERS LEGACY (mantener compatibilidad) ====================
+
+final estudiantesCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
+  final stats = await ref.watch(cursoStatsProvider(cursoId).future);
+  return stats['estudiantes'] ?? 0;
+});
+
+final tareasCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
+  final stats = await ref.watch(cursoStatsProvider(cursoId).future);
+  return stats['tareas'] ?? 0;
+});
+
+final examenesCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
+  final stats = await ref.watch(cursoStatsProvider(cursoId).future);
+  return stats['examenes'] ?? 0;
+});
+
+final unidadesCursoCountProvider = FutureProvider.family<int, int>((ref, cursoId) async {
+  final stats = await ref.watch(cursoStatsProvider(cursoId).future);
+  return stats['unidades'] ?? 0;
 });
 
 class PantallaGestionCurso extends ConsumerStatefulWidget {
