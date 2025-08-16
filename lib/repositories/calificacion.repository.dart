@@ -1,6 +1,4 @@
 import 'package:aulago/models/calificacion.model.dart';
-import 'package:aulago/models/entrega.model.dart';
-import 'package:aulago/models/examen_entrega.model.dart';
 import 'package:aulago/repositories/base.repository.dart';
 import 'package:aulago/repositories/entrega.repository.dart';
 import 'package:aulago/repositories/examen_entrega.repository.dart';
@@ -270,6 +268,8 @@ class CalificacionUnificada {
       puntosTotales: puntosTotales,
       fechaCalificacion: fechaCalificacion,
       calificadoPor: calificadoPor,
+      fechaCreacion: DateTime.now(),
+      fechaActualizacion: DateTime.now(),
     );
   }
 

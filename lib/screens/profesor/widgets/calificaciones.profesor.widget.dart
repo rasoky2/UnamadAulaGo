@@ -197,13 +197,12 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     // --- Dashboard resumen ---
     int totalAprobados = 0;
     int totalReprobados = 0;
-    int totalPendientes = 0;
     double sumaNotas = 0;
-    int totalNotas = 0;
+    int totalEstudiantes = estudiantes.length;
     
     for (final estudiante in estudiantes) {
       double sumaCalificaciones = 0;
-      int cantidadCalificaciones = 0;
+      int totalEvaluaciones = evaluaciones.length;
       
       for (final evaluacion in evaluaciones) {
         final key = '${estudiante.id}-${evaluacion.id}';
@@ -213,26 +212,24 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
           // Convertir puntos a nota sobre 20
           final notaSobre20 = (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
           sumaCalificaciones += notaSobre20;
-          cantidadCalificaciones++;
+        } else {
+          // Si no tiene calificación, se cuenta como 0
+          sumaCalificaciones += 0.0;
         }
       }
       
-      if (cantidadCalificaciones > 0) {
-        final promedio = sumaCalificaciones / cantidadCalificaciones;
-        sumaNotas += promedio;
-        totalNotas++;
-        
-        if (promedio >= 11) {
-          totalAprobados++;
-        } else {
-          totalReprobados++;
-        }
+      // Calcular promedio del estudiante (siempre hay evaluaciones)
+      final promedio = sumaCalificaciones / totalEvaluaciones;
+      sumaNotas += promedio;
+      
+      if (promedio >= 11) {
+        totalAprobados++;
       } else {
-        totalPendientes++;
+        totalReprobados++;
       }
     }
     
-    final promedioGeneral = totalNotas > 0 ? (sumaNotas / totalNotas) : 0.0;
+    final promedioGeneral = totalEstudiantes > 0 ? (sumaNotas / totalEstudiantes) : 0.0;
 
     // --- Filtros y búsqueda ---
     final estudiantesFiltrados = estudiantes.where((estudiante) {
@@ -241,11 +238,9 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
           (estudiante.correoElectronico?.toLowerCase().contains(_filtroTexto.toLowerCase()) ?? false);
       
       final promedio = _calcularPromedioEstudiante(estudiante, evaluaciones, mapaCalificaciones);
-      final estado = promedio == null
-          ? 'Pendiente'
-          : promedio >= 11
-              ? 'Aprobado'
-              : 'Reprobado';
+      final estado = promedio >= 11
+          ? 'Aprobado'
+          : 'Reprobado';
       
       final coincideEstado = _filtroEstado == 'Todos' || estado == _filtroEstado;
       return coincideTexto && coincideEstado;
@@ -271,7 +266,7 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                       // Refrescar todos los providers
                       ref.invalidate(calificacionesCursoProvider(cursoIdInt));
                       
-                      if (mounted) {
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Calificaciones sincronizadas correctamente'),
@@ -280,11 +275,10 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                         );
                       }
                     } catch (e) {
-                      if (mounted) {
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Error al sincronizar: $e'),
-                            backgroundColor: Colors.red,
                           ),
                         );
                       }
@@ -322,12 +316,7 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                     value: '$totalReprobados',
                     color: Colors.red,
                   ),
-                  _InfoBox(
-                    icon: LucideIcons.clock,
-                    label: 'Pendientes',
-                    value: '$totalPendientes',
-                    color: Colors.orange,
-                  ),
+
                 ],
               ),
             ],
@@ -356,7 +345,6 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                       DropdownMenuItem(value: 'Todos', child: Text('Todos')),
                       DropdownMenuItem(value: 'Aprobado', child: Text('Aprobados')),
                       DropdownMenuItem(value: 'Reprobado', child: Text('Reprobados')),
-                      DropdownMenuItem(value: 'Pendiente', child: Text('Pendientes')),
                     ],
                     onChanged: (v) => setState(() => _filtroEstado = v ?? 'Todos'),
                     ),
@@ -439,21 +427,17 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                   DataCell(Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: promedio == null
-                          ? Colors.orange.shade50
-                          : promedio >= 11
-                              ? Colors.green.shade50
-                              : Colors.red.shade50,
+                      color: promedio >= 11
+                          ? Colors.green.shade50
+                          : Colors.red.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      promedio == null ? '-' : promedio.toStringAsFixed(2),
+                      promedio.toStringAsFixed(2),
                       style: TextStyle(
-                        color: promedio == null
-                            ? Colors.orange
-                            : promedio >= 11
-                                ? Colors.green
-                                : Colors.red,
+                        color: promedio >= 11
+                            ? Colors.green
+                            : Colors.red,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -468,13 +452,13 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     );
   }
 
-  double? _calcularPromedioEstudiante(
+  double _calcularPromedioEstudiante(
     EstudianteAdmin estudiante, 
     List<EvaluacionData> evaluaciones, 
     Map<String, CalificacionUnificada> mapaCalificaciones
   ) {
     double suma = 0;
-    int cuenta = 0;
+    int totalEvaluaciones = evaluaciones.length;
     
     for (final evaluacion in evaluaciones) {
       final key = '${estudiante.id}-${evaluacion.id}';
@@ -484,14 +468,14 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
         // Convertir puntos a nota sobre 20
         final notaSobre20 = (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
         suma += notaSobre20;
-        cuenta++;
+      } else {
+        // Si no tiene calificación, se cuenta como 0
+        suma += 0.0;
       }
     }
     
-    if (cuenta == 0) {
-      return null;
-    }
-    return suma / cuenta;
+    // Siempre retornar un promedio (0 si no hay evaluaciones)
+    return totalEvaluaciones > 0 ? suma / totalEvaluaciones : 0.0;
   }
 
   Future<void> _mostrarDialogoNota(
@@ -650,6 +634,8 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
           puntosObtenidos: puntosObtenidos,
           puntosTotales: evaluacion.puntosMaximos,
           fechaCalificacion: calificacionExistente.fechaCalificacion, // Mantener fecha original
+          fechaCreacion: calificacionExistente.fechaCalificacion, // Usar fecha de calificación como fecha de creación
+          fechaActualizacion: DateTime.now(), // Fecha actual como fecha de actualización
         );
         await repo.actualizarCalificacion(calificacionExistente.id, calificacion);
       } else {

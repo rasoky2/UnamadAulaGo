@@ -12,6 +12,35 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// ==================== PROVIDERS OPTIMIZADOS ====================
+
+/// Provider para obtener tareas de un curso específico con caching
+final tareasCursoProvider = FutureProvider.family<List<ModeloTarea>, String>((ref, cursoId) async {
+  try {
+    final repo = TareaRepository();
+    final todasTareas = await repo.obtenerTareas();
+    return todasTareas.where((t) => t.cursoId.toString() == cursoId).toList();
+  } catch (e) {
+    if (kDebugMode) {
+      print('Error obteniendo tareas del curso $cursoId: $e');
+    }
+    return [];
+  }
+});
+
+/// Provider para obtener entregas de una tarea específica con caching
+final entregasTareaProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, tareaId) async {
+  try {
+    final repo = EntregaRepository();
+    return await repo.obtenerEntregasConEstudiante(tareaId);
+  } catch (e) {
+    if (kDebugMode) {
+      print('Error obteniendo entregas de tarea $tareaId: $e');
+    }
+    return [];
+  }
+});
+
 class TareasTab extends ConsumerStatefulWidget {
   const TareasTab({required this.cursoId, super.key});
   final String cursoId;
@@ -21,138 +50,165 @@ class TareasTab extends ConsumerStatefulWidget {
 }
 
 class _TareasTabState extends ConsumerState<TareasTab> {
-  late Future<List<ModeloTarea>> _tareasFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _cargarTareas();
-  }
-
-  void _cargarTareas() {
-    setState(() {
-      _tareasFuture = TareaRepository().obtenerTareas();
-    });
-  }
-
-  void _refrescarTareas() {
-    _cargarTareas();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<ModeloTarea>>(
-      future: _tareasFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text(
-                  'Error: ${snapshot.error}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _refrescarTareas,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Reintentar'),
-                ),
-              ],
+    // Usar el provider optimizado en lugar de FutureBuilder
+    final tareasAsync = ref.watch(tareasCursoProvider(widget.cursoId));
+    
+    return tareasAsync.when(
+      data: (tareas) => _buildTareasContent(tareas),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => _buildErrorContent(error),
+    );
+  }
+
+  Widget _buildTareasContent(List<ModeloTarea> tareas) {
+    if (tareas.isEmpty) {
+      return _buildEmptyState();
+    }
+    
+    return Column(
+      children: [
+        // Header con botón de crear
+        _buildHeader(),
+        // Lista de tareas
+        Expanded(
+          child: _buildTareasList(tareas),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          Icon(LucideIcons.fileText, color: Colors.blue.shade600, size: 24),
+          const SizedBox(width: 12),
+          Text(
+            'Tareas del Curso',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-          );
-        }
-        final tareas = (snapshot.data ?? []).where((t) => t.cursoId.toString() == widget.cursoId).toList();
-        if (tareas.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(LucideIcons.fileText, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                Text(
-                  'Aún no has creado ninguna tarea.',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Crea tu primera tarea para comenzar',
-                  style: TextStyle(color: Colors.grey.shade500),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => mostrarDialogoTarea(context, ref, widget.cursoId, onSuccess: _refrescarTareas),
-                  icon: const Icon(LucideIcons.plus),
-                  label: const Text('Crear Tarea'),
-                )
-              ],
+          ),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: () => _mostrarDialogoTarea(context),
+            icon: const Icon(LucideIcons.plus),
+            label: const Text('Crear Nueva Tarea'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
             ),
-          );
-        }
-        return Column(
-          children: [
-            // Header con botón de crear
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Icon(LucideIcons.fileText, color: Colors.blue.shade600, size: 24),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Tareas del Curso',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: () => mostrarDialogoTarea(context, ref, widget.cursoId, onSuccess: _refrescarTareas),
-                    icon: const Icon(LucideIcons.plus),
-                    label: const Text('Crear Nueva Tarea'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTareasList(List<ModeloTarea> tareas) {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: tareas.length,
+      itemBuilder: (context, index) {
+        final tarea = tareas[index];
+        return _TareaCard(
+          tarea: tarea,
+          onEdit: () => _mostrarDialogoTarea(context, tareaExistente: tarea),
+          onGrade: () => _navegarACalificacion(tarea),
+          onDelete: () => _refrescarTareas(),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(LucideIcons.fileText, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            'Aún no has creado ninguna tarea.',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Colors.grey.shade600,
             ),
-            // Lista de tareas
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: tareas.length,
-                itemBuilder: (context, index) {
-                  final tarea = tareas[index];
-                  return _TareaCard(
-                    tarea: tarea,
-                    onEdit: () => mostrarDialogoTarea(context, ref, widget.cursoId, tareaExistente: tarea, onSuccess: _refrescarTareas),
-                    onGrade: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                           builder: (context) => CalificacionTareaScreen(tareaId: tarea.id.toString()),
-                        ),
-                      );
-                    },
-                    onDelete: _refrescarTareas,
-                  );
-                },
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Crea tu primera tarea para comenzar',
+            style: TextStyle(color: Colors.grey.shade500),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => _mostrarDialogoTarea(context),
+            icon: const Icon(LucideIcons.plus),
+            label: const Text('Crear Tarea'),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorContent(Object error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error, size: 64, color: Colors.red),
+          const SizedBox(height: 16),
+          Text(
+            'Error: $error',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _refrescarTareas,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarDialogoTarea(BuildContext context, {ModeloTarea? tareaExistente}) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(tareaExistente == null ? 'Crear Nueva Tarea' : 'Editar Tarea'),
+          content: _TareaForm(
+            cursoId: widget.cursoId,
+            tarea: tareaExistente,
+            onSuccess: _refrescarTareas,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
             ),
           ],
         );
       },
     );
+  }
+
+  void _navegarACalificacion(ModeloTarea tarea) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CalificacionTareaScreen(tareaId: tarea.id.toString()),
+      ),
+    );
+  }
+
+  void _refrescarTareas() {
+    // Invalidar el provider para refrescar los datos
+    ref.invalidate(tareasCursoProvider(widget.cursoId));
   }
 
   @override
@@ -671,109 +727,95 @@ class _EntregasListWidget extends ConsumerStatefulWidget {
 }
 
 class _EntregasListWidgetState extends ConsumerState<_EntregasListWidget> {
-  final EntregaRepository _entregaRepo = EntregaRepository();
-  late Future<List<Map<String, dynamic>>> _entregasFuture;
-  
-  @override
-  void initState() {
-    super.initState();
-    _cargarEntregas();
-  }
-
-  void _cargarEntregas() {
-    _entregasFuture = _entregaRepo.obtenerEntregasConEstudiante(widget.tarea.id);
-  }
-
   void _refrescarEntregas() {
-    setState(() {
-      _cargarEntregas();
-    });
+    // Invalidar el provider para refrescar los datos
+    ref.invalidate(entregasTareaProvider(widget.tarea.id));
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _entregasFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-                const SizedBox(height: 16),
-                Text(
-                  'Error al cargar entregas',
-                  style: TextStyle(color: Colors.red.shade700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${snapshot.error}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _refrescarEntregas,
-                  icon: const Icon(LucideIcons.refreshCw, size: 16),
-                  label: const Text('Reintentar'),
-                ),
-              ],
-            ),
-          );
-        }
+    // Usar el provider optimizado en lugar de FutureBuilder
+    final entregasAsync = ref.watch(entregasTareaProvider(widget.tarea.id));
+    
+    return entregasAsync.when(
+      data: (entregas) => _buildEntregasContent(entregas),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => _buildErrorContent(error),
+    );
+  }
 
-        final entregas = snapshot.data ?? [];
-        
-        if (entregas.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(LucideIcons.fileX, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                Text(
-                  'Sin entregas',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Aún no hay estudiantes que hayan entregado esta tarea.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade500),
-                ),
-              ],
+  Widget _buildEntregasContent(List<Map<String, dynamic>> entregas) {
+    if (entregas.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.fileX, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Sin entregas',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Colors.grey.shade600,
+              ),
             ),
-          );
-        }
+            const SizedBox(height: 8),
+            Text(
+              'Aún no hay estudiantes que hayan entregado esta tarea.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
+          ],
+        ),
+      );
+    }
 
-        return RefreshIndicator(
-          onRefresh: () async => _refrescarEntregas(),
-          child: ListView.builder(
-            controller: widget.scrollController,
-            padding: const EdgeInsets.all(16),
-            itemCount: entregas.length,
-            itemBuilder: (context, index) {
-              final entregaData = entregas[index];
-              final entrega = ModeloEntrega.fromJson(entregaData);
-              final estudiante = entregaData['estudiantes'] as Map<String, dynamic>;
-              
-              return _EntregaCard(
-                entrega: entrega,
-                estudiante: estudiante,
-                tarea: widget.tarea,
-                onActualizado: _refrescarEntregas,
-              );
-            },
+    return RefreshIndicator(
+      onRefresh: () async => _refrescarEntregas(),
+      child: ListView.builder(
+        controller: widget.scrollController,
+        padding: const EdgeInsets.all(16),
+        itemCount: entregas.length,
+        itemBuilder: (context, index) {
+          final entregaData = entregas[index];
+          final entrega = ModeloEntrega.fromJson(entregaData);
+          final estudiante = entregaData['estudiantes'] as Map<String, dynamic>;
+          
+          return _EntregaCard(
+            entrega: entrega,
+            estudiante: estudiante,
+            tarea: widget.tarea,
+            onActualizado: _refrescarEntregas,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorContent(Object error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'Error al cargar entregas',
+            style: TextStyle(color: Colors.red.shade700),
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          Text(
+            '$error',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _refrescarEntregas,
+            icon: const Icon(LucideIcons.refreshCw, size: 16),
+            label: const Text('Reintentar'),
+          ),
+        ],
+      ),
     );
   }
 }
