@@ -125,6 +125,33 @@ class PreguntaTemporal {
       puntos: puntos,
     );
   }
+
+  /// Crea una PreguntaTemporal desde una PreguntaExamen existente
+  static PreguntaTemporal fromPreguntaExamen(PreguntaExamen pregunta) {
+    final preguntaTemp = PreguntaTemporal();
+    
+    // Establecer el enunciado
+    preguntaTemp.enunciadoController.text = pregunta.enunciado;
+    
+    // Establecer las opciones
+    for (int i = 0; i < pregunta.opciones.length && i < preguntaTemp.opcionesControllers.length; i++) {
+      preguntaTemp.opcionesControllers[i].text = pregunta.opciones[i];
+    }
+    
+    // Establecer la respuesta correcta
+    final respuestaCorrectaTexto = pregunta.respuestaCorrecta;
+    if (respuestaCorrectaTexto != null) {
+      final indexRespuestaCorrecta = pregunta.opciones.indexOf(respuestaCorrectaTexto);
+      if (indexRespuestaCorrecta != -1) {
+        preguntaTemp.respuestaCorrecta = indexRespuestaCorrecta;
+      }
+    }
+    
+    // Establecer los puntos
+    preguntaTemp.puntos = pregunta.puntos;
+    
+    return preguntaTemp;
+  }
 }
 
 /// Widget para mostrar y editar una pregunta

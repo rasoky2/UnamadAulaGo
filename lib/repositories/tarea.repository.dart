@@ -34,11 +34,13 @@ class TareaRepository extends BaseRepository<ModeloTarea> {
   }
 
   Future<ModeloTarea> crearTarea(ModeloTarea tarea) async {
-    return crear(tarea.toJson());
+    // Para crear, solo enviamos los campos editables
+    return crear(tarea.toJsonEditable());
   }
 
   Future<ModeloTarea> actualizarTarea(int id, ModeloTarea tarea) async {
-    return actualizar(id.toString(), tarea.toJson());
+    // Para actualizar, solo enviamos los campos editables
+    return actualizar(id.toString(), tarea.toJsonEditable());
   }
 
   Future<bool> eliminarTarea(int id) async {
