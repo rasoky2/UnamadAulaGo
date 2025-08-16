@@ -360,7 +360,6 @@ class _PantallaCursosAlumnoState extends ConsumerState<PantallaCursosAlumno> {
       const TareasWidget(),
       ExamenesWidget(
         cursoId: (cursoId ?? 0).toString(),
-        onRegresar: () {},
       ),
       ForosWidget(cursoId: (cursoId ?? 0).toString()),
       LecturasAlumnoWidget(cursoId: (cursoId ?? 0).toString()),
@@ -781,7 +780,6 @@ class _PantallaCursosAlumnoState extends ConsumerState<PantallaCursosAlumno> {
       case 'examenes':
         return ExamenesWidget(
           cursoId: (cursoId ?? 0).toString(),
-          onRegresar: () {},
         );
       case 'foros':
         return ForosWidget(cursoId: (cursoId ?? 0).toString());

@@ -1,5 +1,6 @@
 import 'package:aulago/models/lectura.model.dart';
 import 'package:aulago/repositories/base.repository.dart';
+import 'package:flutter/foundation.dart';
 
 class LecturaRepository extends BaseRepository<Lectura> {
   @override
@@ -20,6 +21,26 @@ class LecturaRepository extends BaseRepository<Lectura> {
   Future<List<Lectura>> obtenerLecturas() async {
     final result = await obtener(limite: 1000, offset: 0);
     return result.items;
+  }
+
+  /// Obtiene lecturas filtradas por curso específico
+  Future<List<Lectura>> obtenerLecturasPorCurso(int cursoId) async {
+    try {
+      debugPrint('[$repositoryName] Obteniendo lecturas para curso: $cursoId');
+      
+      final response = await supabase
+          .from(tableName)
+          .select()
+          .eq('curso_id', cursoId)
+          .order('id', ascending: false);
+
+      final lecturas = response.map(fromJson).toList();
+      debugPrint('[$repositoryName] Lecturas obtenidas para curso $cursoId: ${lecturas.length}');
+      return lecturas;
+    } catch (e) {
+      debugPrint('[$repositoryName] Error al obtener lecturas por curso: $e');
+      rethrow;
+    }
   }
 
   Future<Lectura> crearLectura(Lectura lectura) async {

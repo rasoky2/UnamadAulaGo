@@ -12,45 +12,85 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class TareasTab extends ConsumerWidget {
+class TareasTab extends ConsumerStatefulWidget {
   const TareasTab({required this.cursoId, super.key});
   final String cursoId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tareasFuture = TareaRepository().obtenerTareas();
+  ConsumerState<TareasTab> createState() => _TareasTabState();
+}
+
+class _TareasTabState extends ConsumerState<TareasTab> {
+  late Future<List<ModeloTarea>> _tareasFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarTareas();
+  }
+
+  void _cargarTareas() {
+    setState(() {
+      _tareasFuture = TareaRepository().obtenerTareas();
+    });
+  }
+
+  void _refrescarTareas() {
+    _cargarTareas();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return FutureBuilder<List<ModeloTarea>>(
-      future: tareasFuture,
+      future: _tareasFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
           return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Error: ${snapshot.error}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Error: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _refrescarTareas,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
+                ),
+              ],
             ),
-          ],
-        ),
           );
         }
-        final tareas = (snapshot.data ?? []).where((t) => t.cursoId.toString() == cursoId).toList();
+        final tareas = (snapshot.data ?? []).where((t) => t.cursoId.toString() == widget.cursoId).toList();
         if (tareas.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('Aún no has creado ninguna tarea.'),
+                Icon(LucideIcons.fileText, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+                Text(
+                  'Aún no has creado ninguna tarea.',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Crea tu primera tarea para comenzar',
+                  style: TextStyle(color: Colors.grey.shade500),
+                ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
-                  onPressed: () => mostrarDialogoTarea(context, ref, cursoId),
+                  onPressed: () => mostrarDialogoTarea(context, ref, widget.cursoId, onSuccess: _refrescarTareas),
                   icon: const Icon(LucideIcons.plus),
                   label: const Text('Crear Tarea'),
                 )
@@ -58,37 +98,58 @@ class TareasTab extends ConsumerWidget {
             ),
           );
         }
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: tareas.length + 1, // +1 para el botón
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton.icon(
-                    onPressed: () => mostrarDialogoTarea(context, ref, cursoId),
+        return Column(
+          children: [
+            // Header con botón de crear
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Icon(LucideIcons.fileText, color: Colors.blue.shade600, size: 24),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Tareas del Curso',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  ElevatedButton.icon(
+                    onPressed: () => mostrarDialogoTarea(context, ref, widget.cursoId, onSuccess: _refrescarTareas),
                     icon: const Icon(LucideIcons.plus),
                     label: const Text('Crear Nueva Tarea'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                ),
-              );
-            }
-            final tarea = tareas[index - 1];
-            return _TareaCard(
-              tarea: tarea,
-              onEdit: () => mostrarDialogoTarea(context, ref, cursoId, tareaExistente: tarea),
-              onGrade: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                     builder: (context) => CalificacionTareaScreen(tareaId: tarea.id.toString()),
-                  ),
-                );
-              },
-            );
-          },
+                ],
+              ),
+            ),
+            // Lista de tareas
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: tareas.length,
+                itemBuilder: (context, index) {
+                  final tarea = tareas[index];
+                  return _TareaCard(
+                    tarea: tarea,
+                    onEdit: () => mostrarDialogoTarea(context, ref, widget.cursoId, tareaExistente: tarea, onSuccess: _refrescarTareas),
+                    onGrade: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                           builder: (context) => CalificacionTareaScreen(tareaId: tarea.id.toString()),
+                        ),
+                      );
+                    },
+                    onDelete: _refrescarTareas,
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
@@ -97,21 +158,31 @@ class TareasTab extends ConsumerWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(StringProperty('cursoId', cursoId));
+    properties.add(StringProperty('cursoId', widget.cursoId));
   }
 }
 
-class _TareaCard extends StatelessWidget {
-
-  const _TareaCard({required this.tarea, required this.onEdit, required this.onGrade});
+class _TareaCard extends StatefulWidget {
+  const _TareaCard({
+    required this.tarea, 
+    required this.onEdit, 
+    required this.onGrade,
+    required this.onDelete,
+  });
   final ModeloTarea tarea;
   final VoidCallback onEdit;
   final VoidCallback onGrade;
+  final VoidCallback onDelete;
 
+  @override
+  State<_TareaCard> createState() => _TareaCardState();
+}
+
+class _TareaCardState extends State<_TareaCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bool estaVencida = DateTime.now().isAfter(tarea.fechaEntrega);
+    final bool estaVencida = DateTime.now().isAfter(widget.tarea.fechaEntrega);
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -120,10 +191,10 @@ class _TareaCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(tarea.titulo, style: theme.textTheme.titleLarge),
+            Text(widget.tarea.titulo, style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
-              tarea.descripcion ?? 'Sin descripción.',
+              widget.tarea.descripcion ?? 'Sin descripción.',
               style: theme.textTheme.bodyMedium,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -134,7 +205,7 @@ class _TareaCard extends StatelessWidget {
                 Icon(LucideIcons.calendar, size: 16, color: theme.textTheme.bodySmall?.color),
                 const SizedBox(width: 8),
                 Text(
-                  'Entrega: ${DateFormat.yMMMEd('es').add_jm().format(tarea.fechaEntrega)}',
+                  'Entrega: ${DateFormat.yMMMEd('es').add_jm().format(widget.tarea.fechaEntrega)}',
                   style: theme.textTheme.bodySmall,
                 ),
                 const Spacer(),
@@ -152,15 +223,25 @@ class _TareaCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 OutlinedButton.icon(
-                  onPressed: onEdit,
+                  onPressed: widget.onEdit,
                   icon: const Icon(LucideIcons.pencil, size: 16),
                   label: const Text('Editar'),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  onPressed: () => _mostrarEntregasModal(context, tarea),
+                  onPressed: () => _mostrarEntregasModal(context, widget.tarea),
                   icon: const Icon(LucideIcons.graduationCap, size: 16),
                   label: const Text('Ver Entregas'),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () => _confirmarEliminarTarea(context, widget.tarea),
+                  icon: const Icon(LucideIcons.trash2, size: 16),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.red.shade50,
+                    foregroundColor: Colors.red.shade700,
+                  ),
+                  tooltip: 'Eliminar tarea',
                 ),
               ],
             )
@@ -170,16 +251,63 @@ class _TareaCard extends StatelessWidget {
     );
   }
 
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties..add(DiagnosticsProperty<ModeloTarea>('tarea', tarea))
-    ..add(ObjectFlagProperty<VoidCallback>.has('onEdit', onEdit))
-    ..add(ObjectFlagProperty<VoidCallback>.has('onGrade', onGrade));
+  void _confirmarEliminarTarea(BuildContext context, ModeloTarea tarea) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar eliminación'),
+        content: Text('¿Está seguro de eliminar la tarea "${tarea.titulo}"?\n\nEsta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                final repo = TareaRepository();
+                await repo.eliminarTarea(tarea.id);
+                
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Tarea eliminada exitosamente'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  // Refrescar la lista de tareas
+                  if (context.mounted) {
+                    Navigator.of(context).pop(); // Cerrar el modal de entregas si está abierto
+                  }
+                  // Llamar al callback para refrescar la lista
+                  widget.onDelete();
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error al eliminar la tarea: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-void mostrarDialogoTarea(BuildContext context, WidgetRef ref, String cursoId, {ModeloTarea? tareaExistente}) {
+void mostrarDialogoTarea(BuildContext context, WidgetRef ref, String cursoId, {ModeloTarea? tareaExistente, VoidCallback? onSuccess}) {
   showDialog(
     context: context,
     builder: (context) {
@@ -188,7 +316,7 @@ void mostrarDialogoTarea(BuildContext context, WidgetRef ref, String cursoId, {M
         content: _TareaForm(
           cursoId: cursoId,
           tarea: tareaExistente,
-          onSuccess: () => Navigator.of(context).pop(),
+          onSuccess: onSuccess ?? () => Navigator.of(context).pop(),
         ),
         actions: [
           TextButton(
@@ -238,46 +366,82 @@ class _TareaFormState extends ConsumerState<_TareaForm> {
     _puntosController = TextEditingController(text: tarea?.puntosMaximos.toString() ?? '20');
   }
 
+  @override
+  void dispose() {
+    _tituloController.dispose();
+    _descripcionController.dispose();
+    _puntosController.dispose();
+    super.dispose();
+  }
+
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // Datos construidos directamente al crear/actualizar vía repositorio
-
       try {
         final repo = TareaRepository();
+        final cursoIdInt = int.tryParse(widget.cursoId) ?? 0;
+        
         if (widget.tarea == null) {
-          await repo.crearTarea(ModeloTarea(
+          // Crear nueva tarea
+          final nuevaTarea = ModeloTarea(
             id: 0,
-            titulo: _tituloController.text,
-            descripcion: _descripcionController.text,
+            titulo: _tituloController.text.trim(),
+            descripcion: _descripcionController.text.trim().isEmpty ? null : _descripcionController.text.trim(),
             fechaAsignacion: DateTime.now(),
             fechaEntrega: _fechaEntrega,
             puntosMaximos: double.tryParse(_puntosController.text) ?? 20.0,
             estado: 'activa',
-            cursoId: int.tryParse(widget.cursoId) ?? 0,
+            cursoId: cursoIdInt,
             fechaCreacion: DateTime.now(),
             fechaActualizacion: DateTime.now(),
-          ));
+          );
+          
+          await repo.crearTarea(nuevaTarea);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Tarea creada exitosamente'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.of(context).pop(); // Cerrar el diálogo
+            widget.onSuccess(); // Llamar al callback de éxito
+          }
         } else {
-          await repo.actualizarTarea(widget.tarea!.id, widget.tarea!.copyWith(
-            titulo: _tituloController.text,
-            descripcion: _descripcionController.text,
+          // Actualizar tarea existente
+          final tareaActualizada = widget.tarea!.copyWith(
+            titulo: _tituloController.text.trim(),
+            descripcion: _descripcionController.text.trim().isEmpty ? null : _descripcionController.text.trim(),
             fechaEntrega: _fechaEntrega,
             puntosMaximos: double.tryParse(_puntosController.text) ?? widget.tarea!.puntosMaximos,
             fechaActualizacion: DateTime.now(),
-          ));
-        }
-        if (mounted) {
-          widget.onSuccess();
+          );
+          
+          await repo.actualizarTarea(widget.tarea!.id, tareaActualizada);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Tarea actualizada exitosamente'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.of(context).pop(); // Cerrar el diálogo
+            widget.onSuccess(); // Llamar al callback de éxito
+          }
         }
       } catch (e) {
-        if (!mounted) {
-          return;
+        debugPrint('Error al guardar tarea: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al guardar la tarea: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar la tarea: $e'), backgroundColor: Colors.red),
-        );
       } finally {
         if (mounted) {
           setState(() => _isLoading = false);
@@ -296,34 +460,66 @@ class _TareaFormState extends ConsumerState<_TareaForm> {
           children: [
             TextFormField(
               controller: _tituloController,
-              decoration: const InputDecoration(labelText: 'Título'),
-              validator: (value) => value!.isEmpty ? 'El título es requerido' : null,
+              decoration: const InputDecoration(
+                labelText: 'Título *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.title),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'El título es requerido';
+                }
+                return null;
+              },
+              onChanged: (value) {
+                setState(() {});
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _descripcionController,
-              decoration: const InputDecoration(labelText: 'Descripción'),
-               maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Descripción',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.description),
+                helperText: 'Descripción opcional de la tarea',
+              ),
+              maxLines: 3,
+              onChanged: (value) {
+                setState(() {});
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _puntosController,
-              decoration: const InputDecoration(labelText: 'Puntos Máximos'),
-              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Puntos Máximos *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.star),
+                helperText: 'Puntos que vale la tarea',
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               validator: (value) {
-                if (value!.isEmpty) {
-                  return 'Campo requerido';
+                if (value == null || value.trim().isEmpty) {
+                  return 'Los puntos son requeridos';
                 }
-                if (double.tryParse(value) == null) {
-                  return 'Ingrese un número válido';
+                final puntos = double.tryParse(value);
+                if (puntos == null || puntos <= 0) {
+                  return 'Ingrese un número válido mayor a 0';
                 }
                 return null;
               },
+              onChanged: (value) {
+                setState(() {});
+              },
             ),
             const SizedBox(height: 16),
-             ListTile(
-              title: const Text('Fecha de Entrega'),
-              subtitle: Text(DateFormat.yMMMEd('es').add_jm().format(_fechaEntrega)),
+            ListTile(
+              title: const Text('Fecha de Entrega *'),
+              subtitle: Text(
+                DateFormat.yMMMEd('es').add_jm().format(_fechaEntrega),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               trailing: const Icon(LucideIcons.calendar),
               onTap: () async {
                 final date = await showDatePicker(
@@ -345,15 +541,31 @@ class _TareaFormState extends ConsumerState<_TareaForm> {
                 }
 
                 setState(() {
-                  _fechaEntrega = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                  _fechaEntrega = DateTime(
+                    date.year, 
+                    date.month, 
+                    date.day, 
+                    time.hour, 
+                    time.minute
+                  );
                 });
               },
             ),
             const SizedBox(height: 24),
-            if (_isLoading) const CircularProgressIndicator() else ElevatedButton(
-                    onPressed: _submitForm,
-                    child: Text(widget.tarea == null ? 'Crear' : 'Guardar Cambios'),
+            if (_isLoading) 
+              const Center(child: CircularProgressIndicator())
+            else 
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _submitForm,
+                  icon: Icon(widget.tarea == null ? Icons.add : Icons.save),
+                  label: Text(widget.tarea == null ? 'Crear Tarea' : 'Guardar Cambios'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
+                ),
+              ),
           ],
         ),
       ),

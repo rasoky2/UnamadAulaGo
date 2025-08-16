@@ -4,6 +4,7 @@ class Lectura {
     required this.titulo,
     this.descripcion,
     required this.enlacePdf,
+    required this.cursoId,
   });
 
   factory Lectura.fromJson(Map<String, dynamic> json) {
@@ -12,6 +13,7 @@ class Lectura {
       titulo: json['titulo']?.toString() ?? '',
       descripcion: json['descripcion']?.toString(),
       enlacePdf: json['enlace_pdf']?.toString() ?? '',
+      cursoId: json['curso_id'] is int ? json['curso_id'] : int.tryParse(json['curso_id'].toString()) ?? 0,
     );
   }
 
@@ -19,6 +21,7 @@ class Lectura {
   final String titulo;
   final String? descripcion;
   final String enlacePdf;
+  final int cursoId;
 
   Map<String, dynamic> toJson() {
     return {
@@ -26,6 +29,7 @@ class Lectura {
       'titulo': titulo,
       'descripcion': descripcion,
       'enlace_pdf': enlacePdf,
+      'curso_id': cursoId,
     };
   }
 }

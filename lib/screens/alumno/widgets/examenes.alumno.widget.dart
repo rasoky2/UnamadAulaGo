@@ -10,10 +10,8 @@ class ExamenesWidget extends StatelessWidget {
 
   const ExamenesWidget({
     super.key,
-    required this.onRegresar,
     required this.cursoId,
   });
-  final VoidCallback onRegresar;
   final String cursoId;
 
   @override
@@ -26,7 +24,7 @@ class ExamenesWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Título con icono y botón regresar
+          // Título con icono
           Row(
             children: [
               const Icon(
@@ -43,23 +41,13 @@ class ExamenesWidget extends StatelessWidget {
                   color: AppConstants.textPrimary,
                 ),
               ),
-              const Spacer(),
-              ElevatedButton(
-                onPressed: onRegresar,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE91E63),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                ),
-                child: const Text('Regresar', style: TextStyle(fontSize: 12)),
-              ),
             ],
           ),
           const SizedBox(height: 24),
           
           // Tabla de exámenes
           FutureBuilder<List<ModeloExamen>>(
-            future: repo.obtenerExamenes(),
+            future: repo.obtenerExamenesPorCurso(int.parse(cursoId)),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 debugPrint('[ExamenesWidget] Cargando exámenes...');
@@ -74,8 +62,7 @@ class ExamenesWidget extends StatelessWidget {
                   ),
                 );
               }
-              final lista = snapshot.data ?? [];
-              final examenes = lista.where((e) => e.cursoId?.toString() == cursoId).toList();
+              final examenes = snapshot.data ?? [];
               debugPrint('[ExamenesWidget] Exámenes recibidos: cantidad = ${examenes.length}');
               if (examenes.isEmpty) {
                 return const Center(
@@ -281,7 +268,6 @@ class ExamenesWidget extends StatelessWidget {
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
     properties
-      ..add(ObjectFlagProperty<VoidCallback>.has('onRegresar', onRegresar))
       ..add(StringProperty('cursoId', cursoId));
   }
 } 

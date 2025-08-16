@@ -134,18 +134,9 @@ class _DetalleExamenAlumnoScreenState extends State<DetalleExamenAlumnoScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Examen enviado'),
-        content: Text('Respuestas enviadas. Puntuación preliminar: ${calificacion20.toStringAsFixed(2)} / 20'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-            child: const Text('Aceptar'),
-          )
-        ],
+      builder: (context) => _DialogoExamenEnviado(
+        calificacion: calificacion20,
+        onAceptar: () => Navigator.of(context).popUntil((r) => r.isFirst),
       ),
     );
   }
@@ -279,5 +270,80 @@ class _DetalleExamenAlumnoScreenState extends State<DetalleExamenAlumnoScreen> {
       ..add(DiagnosticsProperty<bool>('entregado', _entregado))
       ..add(DiagnosticsProperty<Duration>('restante', _restante))
       ..add(DiagnosticsProperty<List<Map<String, dynamic>>>('_preguntas', _preguntas));
+  }
+}
+
+// ==================== DIALOGO MEJORADO DE EXAMEN ENVIADO ====================
+
+class _DialogoExamenEnviado extends StatefulWidget {
+  const _DialogoExamenEnviado({
+    required this.calificacion,
+    required this.onAceptar,
+  });
+
+  final double calificacion;
+  final VoidCallback onAceptar;
+
+  @override
+  State<_DialogoExamenEnviado> createState() => _DialogoExamenEnviadoState();
+}
+
+class _DialogoExamenEnviadoState extends State<_DialogoExamenEnviado>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final esAprobado = widget.calificacion >= 11.0;
+    final colorPrincipal = esAprobado ? Colors.green : Colors.red;
+    
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Examen enviado',
+          style: TextStyle(color: colorPrincipal),
+        ),
+        content: Text(
+          'Respuestas enviadas. Puntuación preliminar: ${widget.calificacion.toStringAsFixed(2)} / 20',
+          style: TextStyle(color: colorPrincipal),
+        ),
+        actions: [
+          TextButton(
+            onPressed: widget.onAceptar,
+            child: const Text('Aceptar'),
+          )
+        ],
+      ),
+    );
   }
 }
