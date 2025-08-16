@@ -36,8 +36,7 @@ class CalificacionTareaScreen extends ConsumerWidget {
               label: const Text('Registrar 0 manualmente'),
               onPressed: () async {
                 final repo = CalificacionRepository();
-                await repo.crearCalificacion(Calificacion(
-                  id: 0,
+                await repo.crearCalificacion(Calificacion.crear(
                   estudianteId: 0,
                   tareaId: tarea.id,
                   puntosObtenidos: 0,

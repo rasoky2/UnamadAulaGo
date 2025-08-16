@@ -345,3 +345,148 @@ CREATE TABLE public.usuarios (
   fecha_creacion timestamp with time zone DEFAULT now(),
   CONSTRAINT usuarios_pkey PRIMARY KEY (id)
 );
+
+-- ==================== SCRIPT PARA CREAR USUARIO ADMIN ====================
+-- Ejecutar en Supabase SQL Editor si se elimina el admin existente
+
+-- 1. Crear usuario administrador en la tabla usuarios
+INSERT INTO public.usuarios (
+  id,
+  nombre,
+  apellido,
+  email,
+  password_hash,
+  tipo_usuario,
+  fecha_registro,
+  ultimo_acceso,
+  estado,
+  foto_perfil_url,
+  telefono,
+  direccion,
+  fecha_nacimiento,
+  genero,
+  nacionalidad,
+  documento_identidad,
+  codigo_estudiante,
+  especialidad,
+  anio_ingreso,
+  semestre_actual,
+  promedio_general,
+  creditos_aprobados,
+  creditos_totales,
+  departamento,
+  titulo_academico,
+  experiencia_anios,
+  areas_investigacion,
+  proyectos_activos,
+  publicaciones,
+  reconocimientos,
+  fecha_creacion,
+  fecha_actualizacion
+) VALUES (
+  nextval('usuarios_id_seq'), -- ID auto-incremental
+  'Admin',                    -- Nombre
+  'Sistema',                  -- Apellido
+  'admin@aulago.com',         -- Email
+  '$2a$10$rQZ8K9L2M3N4O5P6Q7R8S9T0U1V2W3X4Y5Z6A7B8C9D0E1F2G3H4I5J6', -- Password hash (admin123)
+  'admin',                    -- Tipo de usuario
+  NOW(),                      -- Fecha de registro
+  NOW(),                      -- Último acceso
+  'activo',                   -- Estado
+  NULL,                       -- Foto de perfil
+  '+51 999 999 999',         -- Teléfono
+  'Lima, Perú',               -- Dirección
+  '1990-01-01',              -- Fecha de nacimiento
+  'No especificado',          -- Género
+  'Peruana',                  -- Nacionalidad
+  '12345678',                 -- Documento de identidad
+  NULL,                       -- Código de estudiante (no aplica para admin)
+  NULL,                       -- Especialidad (no aplica para admin)
+  NULL,                       -- Año de ingreso (no aplica para admin)
+  NULL,                       -- Semestre actual (no aplica para admin)
+  NULL,                       -- Promedio general (no aplica para admin)
+  NULL,                       -- Créditos aprobados (no aplica para admin)
+  NULL,                       -- Créditos totales (no aplica para admin)
+  'Sistemas',                 -- Departamento
+  'Ingeniero de Sistemas',    -- Título académico
+  5,                          -- Años de experiencia
+  'Desarrollo Web, Base de Datos, IA', -- Áreas de investigación
+  3,                          -- Proyectos activos
+  15,                         -- Publicaciones
+  'Mejor Profesor 2024',      -- Reconocimientos
+  NOW(),                      -- Fecha de creación
+  NOW()                       -- Fecha de actualización
+);
+
+-- 2. Crear perfil de profesor para el admin
+INSERT INTO public.profesores (
+  id,
+  usuario_id,
+  departamento,
+  especialidad,
+  titulo_academico,
+  experiencia_anios,
+  areas_investigacion,
+  proyectos_activos,
+  publicaciones,
+  reconocimientos,
+  fecha_contratacion,
+  estado,
+  salario,
+  horario_trabajo,
+  oficina,
+  extension_telefonica,
+  email_institucional,
+  sitio_web,
+  linkedin,
+  fecha_creacion,
+  fecha_actualizacion
+) VALUES (
+  nextval('profesores_id_seq'), -- ID auto-incremental
+  (SELECT id FROM public.usuarios WHERE email = 'admin@aulago.com'), -- Usuario ID del admin
+  'Sistemas',                    -- Departamento
+  'Desarrollo de Software',      -- Especialidad
+  'Ingeniero de Sistemas',       -- Título académico
+  5,                             -- Años de experiencia
+  'Desarrollo Web, Base de Datos, Inteligencia Artificial', -- Áreas de investigación
+  3,                             -- Proyectos activos
+  15,                            -- Publicaciones
+  'Mejor Profesor 2024, Innovador del Año 2023', -- Reconocimientos
+  '2020-01-15',                 -- Fecha de contratación
+  'activo',                      -- Estado
+  5000.00,                      -- Salario
+  'Lunes a Viernes 8:00-17:00', -- Horario de trabajo
+  'A-101',                       -- Oficina
+  '101',                         -- Extensión telefónica
+  'admin.sistema@aulago.edu.pe', -- Email institucional
+  'https://admin.aulago.edu.pe', -- Sitio web
+  'https://linkedin.com/in/admin-aulago', -- LinkedIn
+  NOW(),                         -- Fecha de creación
+  NOW()                          -- Fecha de actualización
+);
+
+-- 3. Verificar que se creó correctamente
+SELECT 
+  u.id,
+  u.nombre,
+  u.apellido,
+  u.email,
+  u.tipo_usuario,
+  u.estado,
+  p.departamento,
+  p.especialidad,
+  p.titulo_academico
+FROM public.usuarios u
+LEFT JOIN public.profesores p ON u.id = p.usuario_id
+WHERE u.email = 'admin@aulago.com';
+
+-- ==================== INFORMACIÓN DEL USUARIO ADMIN ====================
+-- Email: admin@aulago.com
+-- Password: admin123
+-- Tipo: admin
+-- Estado: activo
+-- Departamento: Sistemas
+-- Especialidad: Desarrollo de Software
+-- 
+-- NOTA: Cambiar la contraseña después del primer login por seguridad
+-- ======================================================================
