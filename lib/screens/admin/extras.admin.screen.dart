@@ -509,14 +509,14 @@ class _DialogoAnuncioState extends ConsumerState<_DialogoAnuncio> {
       _contenidoController.text = widget.anuncio!.contenido;
     }
   }
-  
+
   @override
   void dispose() {
     _tituloController.dispose();
     _contenidoController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final esEdicion = widget.anuncio != null;
@@ -525,10 +525,10 @@ class _DialogoAnuncioState extends ConsumerState<_DialogoAnuncio> {
       child: Container(
         width: 500,
         padding: const EdgeInsets.all(24),
-        child: Column(
+      child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Row(
               children: [
                 Icon(esEdicion ? Icons.edit : Icons.add, color: Theme.of(context).primaryColor),
@@ -548,9 +548,9 @@ class _DialogoAnuncioState extends ConsumerState<_DialogoAnuncio> {
             const SizedBox(height: 24),
             Form(
               key: _formKey,
-              child: Column(
-                children: [
-                  TextFormField(
+                child: Column(
+                  children: [
+                    TextFormField(
                     controller: _tituloController,
                     decoration: const InputDecoration(
                       labelText: 'Título *',
@@ -559,7 +559,7 @@ class _DialogoAnuncioState extends ConsumerState<_DialogoAnuncio> {
                     validator: (value) => value == null || value.trim().isEmpty ? 'El título es obligatorio' : null,
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
+                    TextFormField(
                     controller: _contenidoController,
                     decoration: const InputDecoration(
                       labelText: 'Contenido *',
@@ -568,10 +568,10 @@ class _DialogoAnuncioState extends ConsumerState<_DialogoAnuncio> {
                     minLines: 4,
                     maxLines: 8,
                     validator: (value) => value == null || value.trim().isEmpty ? 'El contenido es obligatorio' : null,
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -706,13 +706,13 @@ class _DialogoFechaImportanteState extends ConsumerState<_DialogoFechaImportante
                   icon: const Icon(Icons.close),
                 ),
               ],
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 24),
             Form(
               key: _formKey,
-              child: Column(
-                children: [
-                  TextFormField(
+                child: Column(
+                  children: [
+                    TextFormField(
                     controller: _tituloController,
                     decoration: const InputDecoration(
                       labelText: 'Título *',
@@ -721,15 +721,15 @@ class _DialogoFechaImportanteState extends ConsumerState<_DialogoFechaImportante
                     validator: (value) => value == null || value.trim().isEmpty ? 'El título es obligatorio' : null,
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
+                    TextFormField(
                     controller: _descripcionController,
                     decoration: const InputDecoration(
                       labelText: 'Descripción',
                       border: OutlineInputBorder(),
                     ),
                     minLines: 3,
-                    maxLines: 5,
-                  ),
+                      maxLines: 5,
+                    ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _categoriaController,
@@ -740,10 +740,10 @@ class _DialogoFechaImportanteState extends ConsumerState<_DialogoFechaImportante
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InputDecorator(
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InputDecorator(
                           decoration: const InputDecoration(
                             labelText: 'Fecha del evento *',
                             border: OutlineInputBorder(),
@@ -751,30 +751,30 @@ class _DialogoFechaImportanteState extends ConsumerState<_DialogoFechaImportante
                           child: Text(
                             _fechaEvento == null ? 'Seleccionar' : _formatearFecha(_fechaEvento!),
                           ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          final now = DateTime.now();
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _fechaEvento ?? now,
-                            firstDate: DateTime(now.year - 1),
-                            lastDate: DateTime(now.year + 5),
-                          );
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final now = DateTime.now();
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _fechaEvento ?? now,
+                              firstDate: DateTime(now.year - 1),
+                              lastDate: DateTime(now.year + 5),
+                            );
                           if (picked != null) {
                             setState(() => _fechaEvento = picked);
                           }
-                        },
-                        icon: const Icon(Icons.event),
-                        label: const Text('Elegir fecha'),
-                      ),
-                    ],
-                  ),
-                ],
+                          },
+                          icon: const Icon(Icons.event),
+                          label: const Text('Elegir fecha'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,

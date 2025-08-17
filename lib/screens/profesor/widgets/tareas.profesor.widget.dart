@@ -3,6 +3,7 @@ import 'package:aulago/models/entrega.model.dart';
 import 'package:aulago/models/tarea.model.dart';
 import 'package:aulago/repositories/entrega.repository.dart';
 import 'package:aulago/repositories/tarea.repository.dart';
+import 'package:aulago/repositories/calificacion.repository.dart';
 import 'package:aulago/screens/profesor/widgets/calificacion_tarea.widget.dart';
 import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
@@ -312,7 +313,7 @@ class _TareaCardState extends State<_TareaCard> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar eliminación'),
-        content: Text('¿Está seguro de eliminar la tarea "${tarea.titulo}"?\n\nEsta acción no se puede deshacer.'),
+        content: Text('¿Está seguro de eliminar la tarea "${tarea.titulo}"?\n\n⚠️ Esta acción eliminará también todas las entregas, calificaciones y archivos asociados.\n\n🚨 Esta acción no se puede deshacer.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -321,27 +322,60 @@ class _TareaCardState extends State<_TareaCard> {
           ElevatedButton(
             onPressed: () async {
               try {
+                // Mostrar indicador de carga
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const AlertDialog(
+                    content: Row(
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(width: 16),
+                        Text('Eliminando tarea y datos asociados...'),
+                      ],
+                    ),
+                  ),
+                );
+
                 final repo = TareaRepository();
+                final entregaRepo = EntregaRepository();
+                final calificacionRepo = CalificacionRepository();
+                
+                // 1. Primero eliminar todas las calificaciones asociadas a la tarea
+                debugPrint('[TareasProfesor] Eliminando calificaciones asociadas a la tarea ${tarea.id}');
+                await calificacionRepo.eliminarCalificacionesPorTarea(tarea.id);
+                
+                // 2. Luego eliminar todas las entregas asociadas
+                debugPrint('[TareasProfesor] Eliminando entregas asociadas a la tarea ${tarea.id}');
+                await entregaRepo.eliminarEntregasPorTarea(tarea.id);
+                
+                // 3. Finalmente eliminar la tarea
+                debugPrint('[TareasProfesor] Eliminando tarea ${tarea.id}');
                 await repo.eliminarTarea(tarea.id);
                 
                 if (mounted) {
+                  // Cerrar diálogo de carga
                   Navigator.of(context).pop();
+                  // Cerrar diálogo de confirmación
+                  Navigator.of(context).pop();
+                  
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Tarea eliminada exitosamente'),
+                      content: Text('Tarea y todos los datos asociados eliminados exitosamente'),
                       backgroundColor: Colors.green,
                     ),
                   );
+                  
                   // Refrescar la lista de tareas
-                  if (context.mounted) {
-                    Navigator.of(context).pop(); // Cerrar el modal de entregas si está abierto
-                  }
-                  // Llamar al callback para refrescar la lista
                   widget.onDelete();
                 }
               } catch (e) {
+                debugPrint('[TareasProfesor] Error al eliminar tarea: $e');
+                
                 if (mounted) {
+                  // Cerrar diálogo de carga
                   Navigator.of(context).pop();
+                  
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error al eliminar la tarea: $e'),

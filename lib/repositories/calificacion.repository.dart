@@ -51,10 +51,51 @@ class CalificacionRepository extends BaseRepository<Calificacion> {
     }
   }
 
-  /// Obtiene calificaciones unificadas (entregas + tabla calificaciones)
+  /// Obtiene calificaciones unificadas usando función SQL optimizada
   Future<List<CalificacionUnificada>> obtenerCalificacionesUnificadasPorCurso(int cursoId) async {
     try {
-      debugPrint('[$repositoryName] Obteniendo calificaciones unificadas para curso: $cursoId');
+      debugPrint('[$repositoryName] Obteniendo calificaciones unificadas para curso: $cursoId (SQL optimizado)');
+      
+      // Usar función SQL optimizada que obtiene todo en una sola consulta
+      final response = await supabase
+          .rpc('obtener_calificaciones_unificadas_curso', params: {'p_curso_id': cursoId});
+      
+      final calificaciones = <CalificacionUnificada>[];
+      
+      for (final row in response) {
+        calificaciones.add(CalificacionUnificada(
+          id: row['id'],
+          estudianteId: row['estudiante_id'],
+          tareaId: row['tarea_id'],
+          examenId: row['examen_id'],
+          cursoId: row['curso_id'] ?? cursoId,
+          puntosObtenidos: (row['puntos_obtenidos'] as num).toDouble(),
+          puntosTotales: (row['puntos_totales'] as num).toDouble(),
+          fechaCalificacion: DateTime.parse(row['fecha_calificacion']),
+          calificadoPor: row['calificado_por'],
+          fuente: row['fuente'],
+          // Información adicional para optimizar la UI
+          estudianteNombre: row['estudiante_nombre'],
+          estudianteCodigo: row['estudiante_codigo'],
+          evaluacionTitulo: row['evaluacion_titulo'],
+          evaluacionTipo: row['evaluacion_tipo'],
+        ));
+      }
+      
+      debugPrint('[$repositoryName] ✅ ${calificaciones.length} calificaciones unificadas obtenidas (SQL optimizado)');
+      return calificaciones;
+    } catch (e) {
+      debugPrint('[$repositoryName] ❌ Error al obtener calificaciones unificadas (SQL optimizado): $e');
+      // Fallback al método anterior si la función SQL falla
+      debugPrint('[$repositoryName] 🔄 Usando método fallback...');
+      return _obtenerCalificacionesUnificadasFallback(cursoId);
+    }
+  }
+
+  /// Método fallback para obtener calificaciones (método anterior)
+  Future<List<CalificacionUnificada>> _obtenerCalificacionesUnificadasFallback(int cursoId) async {
+    try {
+      debugPrint('[$repositoryName] Usando método fallback para curso: $cursoId');
       
       final calificaciones = <CalificacionUnificada>[];
       
@@ -90,12 +131,10 @@ class CalificacionRepository extends BaseRepository<Calificacion> {
               id: entrega.id,
               estudianteId: entrega.estudianteId,
               tareaId: entrega.tareaId,
-              examenId: null,
               cursoId: cursoId,
               puntosObtenidos: entrega.calificacion!,
               puntosTotales: 20.0, // Valor por defecto, se debería obtener de la tarea
               fechaCalificacion: entrega.fechaActualizacion ?? entrega.fechaEntrega,
-              calificadoPor: null,
               fuente: 'entrega_tarea',
             ));
           }
@@ -116,31 +155,63 @@ class CalificacionRepository extends BaseRepository<Calificacion> {
             calificaciones.add(CalificacionUnificada(
               id: entrega.id,
               estudianteId: entrega.estudianteId,
-              tareaId: null,
               examenId: entrega.examenId,
               cursoId: cursoId,
               puntosObtenidos: entrega.calificacion!,
               puntosTotales: 20.0, // Valor por defecto, se debería obtener del examen
               fechaCalificacion: entrega.fechaFin ?? entrega.fechaInicio,
-              calificadoPor: null,
               fuente: 'entrega_examen',
             ));
           }
         }
       }
       
-      debugPrint('[$repositoryName] ✅ ${calificaciones.length} calificaciones unificadas obtenidas');
+      debugPrint('[$repositoryName] ✅ ${calificaciones.length} calificaciones unificadas obtenidas (fallback)');
       return calificaciones;
     } catch (e) {
-      debugPrint('[$repositoryName] ❌ Error al obtener calificaciones unificadas: $e');
+      debugPrint('[$repositoryName] ❌ Error en método fallback: $e');
       rethrow;
     }
   }
 
-  /// Sincroniza calificaciones entre entregas y tabla de calificaciones
+  /// Sincroniza calificaciones usando función SQL optimizada
   Future<void> sincronizarCalificaciones(int cursoId) async {
     try {
-      debugPrint('[$repositoryName] Sincronizando calificaciones para curso: $cursoId');
+      debugPrint('[$repositoryName] 🔥 INICIANDO SINCRONIZACIÓN SQL OPTIMIZADA para curso: $cursoId');
+      
+      // Intentar múltiples veces con la función SQL antes de usar fallback
+      for (int intento = 1; intento <= 3; intento++) {
+        try {
+          debugPrint('[$repositoryName] Intento $intento de 3 usando función SQL...');
+          
+          final response = await supabase
+              .rpc('sincronizar_calificaciones_curso', params: {'p_curso_id': cursoId});
+          
+          debugPrint('[$repositoryName] ✅ Sincronización SQL exitosa: $response registros procesados');
+          return; // Salir si es exitoso
+        } catch (e) {
+          debugPrint('[$repositoryName] ❌ Intento $intento falló: $e');
+          if (intento < 3) {
+            debugPrint('[$repositoryName] ⏳ Esperando $intento segundo(s) antes del siguiente intento...');
+            await Future.delayed(Duration(seconds: intento)); // Espera progresiva
+          }
+        }
+      }
+      
+      // Si todos los intentos fallan, usar fallback
+      debugPrint('[$repositoryName] 🚨 Todos los intentos SQL fallaron, usando fallback...');
+      await _sincronizarCalificacionesFallback(cursoId);
+      
+    } catch (e) {
+      debugPrint('[$repositoryName] 💥 Error crítico en sincronización: $e');
+      // No rethrow para evitar que falle toda la sincronización
+    }
+  }
+
+  /// Método fallback para sincronización (método anterior)
+  Future<void> _sincronizarCalificacionesFallback(int cursoId) async {
+    try {
+      debugPrint('[$repositoryName] Sincronizando calificaciones para curso: $cursoId (fallback)');
       
       // 1. Sincronizar calificaciones de tareas
       final entregas = await _entregaRepo.obtenerEntregas();
@@ -150,17 +221,22 @@ class CalificacionRepository extends BaseRepository<Calificacion> {
           final existe = await _existeCalificacion(entrega.tareaId, null, entrega.estudianteId);
           
           if (!existe) {
-            // Crear nueva calificación
-            final calificacion = Calificacion.crear(
-              estudianteId: entrega.estudianteId,
-              tareaId: entrega.tareaId,
-              examenId: null,
-              cursoId: cursoId,
-              puntosObtenidos: entrega.calificacion!,
-              puntosTotales: 20.0, // Se debería obtener de la tarea
-              fechaCalificacion: entrega.fechaActualizacion ?? entrega.fechaEntrega,
-            );
-            await crearCalificacion(calificacion);
+            try {
+              // Crear nueva calificación
+              final calificacion = Calificacion.crear(
+                estudianteId: entrega.estudianteId,
+                tareaId: entrega.tareaId,
+                cursoId: cursoId,
+                puntosObtenidos: entrega.calificacion!,
+                puntosTotales: 20.0, // Se debería obtener de la tarea
+                fechaCalificacion: entrega.fechaActualizacion ?? entrega.fechaEntrega,
+              );
+              await crearCalificacion(calificacion);
+              debugPrint('[$repositoryName] ✅ Calificación de tarea sincronizada para estudiante ${entrega.estudianteId}');
+            } catch (e) {
+              debugPrint('[$repositoryName] ⚠️ Error al sincronizar calificación de tarea: $e');
+              // Continuar con la siguiente calificación
+            }
           }
         }
       }
@@ -173,25 +249,30 @@ class CalificacionRepository extends BaseRepository<Calificacion> {
           final existe = await _existeCalificacion(null, entrega.examenId, entrega.estudianteId);
           
           if (!existe) {
-            // Crear nueva calificación
-            final calificacion = Calificacion.crear(
-              estudianteId: entrega.estudianteId,
-              tareaId: null,
-              examenId: entrega.examenId,
-              cursoId: cursoId,
-              puntosObtenidos: entrega.calificacion!,
-              puntosTotales: 20.0, // Se debería obtener del examen
-              fechaCalificacion: entrega.fechaFin ?? entrega.fechaInicio,
-            );
-            await crearCalificacion(calificacion);
+            try {
+              // Crear nueva calificación
+              final calificacion = Calificacion.crear(
+                estudianteId: entrega.estudianteId,
+                examenId: entrega.examenId,
+                cursoId: cursoId,
+                puntosObtenidos: entrega.calificacion!,
+                puntosTotales: 20.0, // Se debería obtener del examen
+                fechaCalificacion: entrega.fechaFin ?? entrega.fechaInicio,
+              );
+              await crearCalificacion(calificacion);
+              debugPrint('[$repositoryName] ✅ Calificación de examen sincronizada para estudiante ${entrega.estudianteId}');
+            } catch (e) {
+              debugPrint('[$repositoryName] ⚠️ Error al sincronizar calificación de examen: $e');
+              // Continuar con la siguiente calificación
+            }
           }
         }
       }
       
-      debugPrint('[$repositoryName] ✅ Sincronización completada');
+      debugPrint('[$repositoryName] ✅ Sincronización completada (fallback)');
     } catch (e) {
-      debugPrint('[$repositoryName] ❌ Error en sincronización: $e');
-      rethrow;
+      debugPrint('[$repositoryName] ❌ Error en sincronización fallback: $e');
+      // No rethrow para evitar que falle toda la sincronización
     }
   }
 
@@ -228,6 +309,134 @@ class CalificacionRepository extends BaseRepository<Calificacion> {
     await eliminar(id.toString());
     return true;
   }
+
+  /// Obtiene estadísticas del curso usando función SQL optimizada
+  Future<Map<String, dynamic>> obtenerEstadisticasCurso(int cursoId) async {
+    try {
+      debugPrint('[$repositoryName] Obteniendo estadísticas del curso: $cursoId (SQL optimizado)');
+      
+      final response = await supabase
+          .rpc('obtener_estadisticas_curso', params: {'p_curso_id': cursoId});
+      
+      if (response.isNotEmpty) {
+        final stats = response.first;
+        return {
+          'totalEstudiantes': stats['total_estudiantes'],
+          'totalEvaluaciones': stats['total_evaluaciones'],
+          'promedioGeneral': stats['promedio_general'].toDouble(),
+          'totalAprobados': stats['total_aprobados'],
+          'totalReprobados': stats['total_reprobados'],
+          'ultimaActividad': DateTime.parse(stats['ultima_actividad']),
+        };
+      }
+      
+      // Valores por defecto si no hay datos
+      return {
+        'totalEstudiantes': 0,
+        'totalEvaluaciones': 0,
+        'promedioGeneral': 0.0,
+        'totalAprobados': 0,
+        'totalReprobados': 0,
+        'ultimaActividad': DateTime.now(),
+      };
+    } catch (e) {
+      debugPrint('[$repositoryName] ❌ Error al obtener estadísticas: $e');
+      // Valores por defecto en caso de error
+      return {
+        'totalEstudiantes': 0,
+        'totalEvaluaciones': 0,
+        'promedioGeneral': 0.0,
+        'totalAprobados': 0,
+        'totalReprobados': 0,
+        'ultimaActividad': DateTime.now(),
+      };
+    }
+  }
+
+  /// Obtiene estadísticas del dashboard usando función SQL optimizada
+  Future<Map<String, dynamic>> obtenerEstadisticasDashboard(int cursoId) async {
+    try {
+      debugPrint('[$repositoryName] Obteniendo estadísticas del dashboard para curso: $cursoId (SQL optimizado)');
+      
+      final response = await supabase
+          .rpc('obtener_estadisticas_dashboard_curso', params: {'p_curso_id': cursoId});
+      
+      if (response.isNotEmpty) {
+        final stats = response.first;
+        return {
+          'totalEstudiantes': stats['total_estudiantes'],
+          'totalEvaluaciones': stats['total_evaluaciones'],
+          'promedioGeneral': (stats['promedio_general'] as num).toDouble(),
+          'totalAprobados': stats['total_aprobados'],
+          'totalReprobados': stats['total_reprobados'],
+          'ultimaActividad': DateTime.parse(stats['ultima_actividad']),
+        };
+      }
+      
+      // Valores por defecto si no hay datos
+      return {
+        'totalEstudiantes': 0,
+        'totalEvaluaciones': 0,
+        'promedioGeneral': 0.0,
+        'totalAprobados': 0,
+        'totalReprobados': 0,
+        'ultimaActividad': DateTime.now(),
+      };
+    } catch (e) {
+      debugPrint('[$repositoryName] ❌ Error al obtener estadísticas del dashboard: $e');
+      // Valores por defecto en caso de error
+      return {
+        'totalEstudiantes': 0,
+        'totalEvaluaciones': 0,
+        'promedioGeneral': 0.0,
+        'totalAprobados': 0,
+        'totalReprobados': 0,
+        'ultimaActividad': DateTime.now(),
+      };
+    }
+  }
+
+  /// Elimina todas las calificaciones asociadas a una tarea específica
+  /// Útil para eliminación en cascada cuando se elimina una tarea
+  Future<bool> eliminarCalificacionesPorTarea(int tareaId) async {
+    try {
+      debugPrint('[$repositoryName] 🗑️ Eliminando calificaciones para tarea: $tareaId');
+      
+      // Buscar y eliminar calificaciones que tengan tarea_id = tareaId
+      await supabase
+          .from(tableName)
+          .delete()
+          .eq('tarea_id', tareaId);
+      
+      debugPrint('[$repositoryName] ✅ Calificaciones eliminadas para tarea $tareaId');
+      return true;
+      
+    } catch (e) {
+      debugPrint('[$repositoryName] ❌ Error al eliminar calificaciones por tarea: $e');
+      rethrow;
+    }
+  }
+
+  /// Elimina todas las calificaciones asociadas a un examen específico
+  /// Útil para eliminación en cascada cuando se elimina un examen
+  Future<bool> eliminarCalificacionesPorExamen(int examenId) async {
+    try {
+      debugPrint('[$repositoryName] 🗑️ Eliminando calificaciones para examen: $examenId');
+      
+      // Buscar y eliminar calificaciones que tengan examen_id = examenId
+      await supabase
+          .from(tableName)
+          .delete()
+          .eq('examen_id', examenId);
+      
+      debugPrint('[$repositoryName] ✅ Calificaciones eliminadas para examen $examenId');
+      return true;
+      
+    } catch (e) {
+      debugPrint('[$repositoryName] ❌ Error al eliminar calificaciones por examen: $e');
+      rethrow;
+    }
+  }
 }
 
 /// Modelo unificado para calificaciones de diferentes fuentes
@@ -243,6 +452,10 @@ class CalificacionUnificada {
     required this.fechaCalificacion,
     this.calificadoPor,
     required this.fuente,
+    this.estudianteNombre,
+    this.estudianteCodigo,
+    this.evaluacionTitulo,
+    this.evaluacionTipo,
   });
 
   final int id;
@@ -255,6 +468,12 @@ class CalificacionUnificada {
   final DateTime fechaCalificacion;
   final int? calificadoPor;
   final String fuente; // 'tabla_calificaciones', 'entrega_tarea', 'entrega_examen'
+  
+  // Campos adicionales para optimizar la UI (opcionales)
+  final String? estudianteNombre;
+  final String? estudianteCodigo;
+  final String? evaluacionTitulo;
+  final String? evaluacionTipo;
 
   /// Convierte a modelo Calificacion estándar
   Calificacion toCalificacion() {

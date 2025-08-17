@@ -12,19 +12,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 // Providers para datos de calificaciones
-final estudiantesMatriculadosProvider = FutureProvider.family<List<EstudianteAdmin>, int>((ref, cursoId) async {
+final estudiantesMatriculadosProvider =
+    FutureProvider.family<List<EstudianteAdmin>, int>((ref, cursoId) async {
   final matriculaRepo = MatriculaRepository();
   final estudianteRepo = EstudianteRepository();
-  
+
   // Obtener matriculas del curso
   final matriculas = await matriculaRepo.obtenerMatriculas();
-  final matriculasDelCurso = matriculas.where((m) => m.cursoId == cursoId).toList();
-  
+  final matriculasDelCurso =
+      matriculas.where((m) => m.cursoId == cursoId).toList();
+
   // Obtener datos completos de estudiantes
   final estudiantes = <EstudianteAdmin>[];
   for (final matricula in matriculasDelCurso) {
     try {
-      final estudiante = await estudianteRepo.obtenerEstudiantePorId(matricula.estudianteId);
+      final estudiante =
+          await estudianteRepo.obtenerEstudiantePorId(matricula.estudianteId);
       if (estudiante != null) {
         estudiantes.add(estudiante);
       }
@@ -32,20 +35,22 @@ final estudiantesMatriculadosProvider = FutureProvider.family<List<EstudianteAdm
       debugPrint('Error obteniendo estudiante ${matricula.estudianteId}: $e');
     }
   }
-  
-  return estudiantes..sort((a, b) => a.nombreCompleto.compareTo(b.nombreCompleto));
+
+  return estudiantes
+    ..sort((a, b) => a.nombreCompleto.compareTo(b.nombreCompleto));
 });
 
-final evaluacionesCursoProvider = FutureProvider.family<List<EvaluacionData>, int>((ref, cursoId) async {
+final evaluacionesCursoProvider =
+    FutureProvider.family<List<EvaluacionData>, int>((ref, cursoId) async {
   final tareaRepo = TareaRepository();
   final examenRepo = ExamenRepository();
-  
+
   final evaluaciones = <EvaluacionData>[];
-  
+
   // Obtener tareas del curso
   final tareas = await tareaRepo.obtenerTareas();
   final tareasDelCurso = tareas.where((t) => t.cursoId == cursoId).toList();
-  
+
   for (final tarea in tareasDelCurso) {
     evaluaciones.add(EvaluacionData(
       id: tarea.id.toString(),
@@ -55,10 +60,10 @@ final evaluacionesCursoProvider = FutureProvider.family<List<EvaluacionData>, in
       fechaEntrega: tarea.fechaEntrega,
     ));
   }
-  
+
   // Obtener exámenes del curso
   final examenes = await examenRepo.obtenerExamenesPorCurso(cursoId);
-  
+
   for (final examen in examenes) {
     evaluaciones.add(EvaluacionData(
       id: examen.id.toString(),
@@ -68,19 +73,21 @@ final evaluacionesCursoProvider = FutureProvider.family<List<EvaluacionData>, in
       fechaEntrega: examen.fechaLimite,
     ));
   }
-  
+
   // Ordenar por fecha de entrega
   evaluaciones.sort((a, b) => a.fechaEntrega.compareTo(b.fechaEntrega));
-  
+
   return evaluaciones;
 });
 
-final calificacionesCursoProvider = FutureProvider.family<List<CalificacionUnificada>, int>((ref, cursoId) async {
+final calificacionesCursoProvider =
+    FutureProvider.family<List<CalificacionUnificada>, int>(
+        (ref, cursoId) async {
   final repo = CalificacionRepository();
-  
+
   // Primero sincronizar para asegurar que todas las calificaciones estén en la tabla
   await repo.sincronizarCalificaciones(cursoId);
-  
+
   // Luego obtener las calificaciones unificadas
   return repo.obtenerCalificacionesUnificadasPorCurso(cursoId);
 });
@@ -109,9 +116,11 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     final esMovil = ancho < 700;
     final cursoIdInt = int.tryParse(widget.cursoId) ?? 0;
 
-    final estudiantesAsync = ref.watch(estudiantesMatriculadosProvider(cursoIdInt));
+    final estudiantesAsync =
+        ref.watch(estudiantesMatriculadosProvider(cursoIdInt));
     final evaluacionesAsync = ref.watch(evaluacionesCursoProvider(cursoIdInt));
-    final calificacionesAsync = ref.watch(calificacionesCursoProvider(cursoIdInt));
+    final calificacionesAsync =
+        ref.watch(calificacionesCursoProvider(cursoIdInt));
 
     return estudiantesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -124,7 +133,8 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
             Text('Error al cargar datos: $error'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => ref.refresh(estudiantesMatriculadosProvider(cursoIdInt)),
+              onPressed: () =>
+                  ref.refresh(estudiantesMatriculadosProvider(cursoIdInt)),
               child: const Text('Reintentar'),
             ),
           ],
@@ -146,7 +156,8 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
 
         return evaluacionesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(child: Text('Error al cargar evaluaciones: $error')),
+          error: (error, stack) =>
+              Center(child: Text('Error al cargar evaluaciones: $error')),
           data: (evaluaciones) {
             if (evaluaciones.isEmpty) {
               return const Center(
@@ -155,7 +166,8 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                   children: [
                     Icon(LucideIcons.fileText, size: 48, color: Colors.grey),
                     SizedBox(height: 16),
-                    Text('Aún no se han creado tareas o exámenes para este curso'),
+                    Text(
+                        'Aún no se han creado tareas o exámenes para este curso'),
                   ],
                 ),
               );
@@ -163,7 +175,8 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
 
             return calificacionesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Error al cargar calificaciones: $error')),
+              error: (error, stack) =>
+                  Center(child: Text('Error al cargar calificaciones: $error')),
               data: (calificaciones) => _construirInterfazCompleta(
                 context,
                 estudiantes,
@@ -188,7 +201,7 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     // --- Crear mapa de calificaciones ---
     final mapaCalificaciones = <String, CalificacionUnificada>{};
     for (final calificacion in calificaciones) {
-      final key = calificacion.tareaId != null 
+      final key = calificacion.tareaId != null
           ? '${calificacion.estudianteId}-${calificacion.tareaId}'
           : '${calificacion.estudianteId}-${calificacion.examenId}';
       mapaCalificaciones[key] = calificacion;
@@ -199,50 +212,57 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     int totalReprobados = 0;
     double sumaNotas = 0;
     final int totalEstudiantes = estudiantes.length;
-    
+
     for (final estudiante in estudiantes) {
       double sumaCalificaciones = 0;
       final int totalEvaluaciones = evaluaciones.length;
-      
+
       for (final evaluacion in evaluaciones) {
         final key = '${estudiante.id}-${evaluacion.id}';
         final calificacion = mapaCalificaciones[key];
-        
+
         if (calificacion != null) {
           // Convertir puntos a nota sobre 20
-          final notaSobre20 = (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
+          final notaSobre20 =
+              (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
           sumaCalificaciones += notaSobre20;
         } else {
           // Si no tiene calificación, se cuenta como 0
           sumaCalificaciones += 0.0;
         }
       }
-      
+
       // Calcular promedio del estudiante (siempre hay evaluaciones)
       final promedio = sumaCalificaciones / totalEvaluaciones;
       sumaNotas += promedio;
-      
+
       if (promedio >= 11) {
         totalAprobados++;
       } else {
         totalReprobados++;
       }
     }
-    
-    final promedioGeneral = totalEstudiantes > 0 ? (sumaNotas / totalEstudiantes) : 0.0;
+
+    final promedioGeneral =
+        totalEstudiantes > 0 ? (sumaNotas / totalEstudiantes) : 0.0;
 
     // --- Filtros y búsqueda ---
     final estudiantesFiltrados = estudiantes.where((estudiante) {
-      final coincideTexto = _filtroTexto.isEmpty || 
-          estudiante.nombreCompleto.toLowerCase().contains(_filtroTexto.toLowerCase()) || 
-          (estudiante.correoElectronico?.toLowerCase().contains(_filtroTexto.toLowerCase()) ?? false);
-      
-      final promedio = _calcularPromedioEstudiante(estudiante, evaluaciones, mapaCalificaciones);
-      final estado = promedio >= 11
-          ? 'Aprobado'
-          : 'Reprobado';
-      
-      final coincideEstado = _filtroEstado == 'Todos' || estado == _filtroEstado;
+      final coincideTexto = _filtroTexto.isEmpty ||
+          estudiante.nombreCompleto
+              .toLowerCase()
+              .contains(_filtroTexto.toLowerCase()) ||
+          (estudiante.correoElectronico
+                  ?.toLowerCase()
+                  .contains(_filtroTexto.toLowerCase()) ??
+              false);
+
+      final promedio = _calcularPromedioEstudiante(
+          estudiante, evaluaciones, mapaCalificaciones);
+      final estado = promedio >= 11 ? 'Aprobado' : 'Reprobado';
+
+      final coincideEstado =
+          _filtroEstado == 'Todos' || estado == _filtroEstado;
       return coincideTexto && coincideEstado;
     }).toList();
 
@@ -261,24 +281,39 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                     try {
                       final cursoIdInt = int.tryParse(widget.cursoId) ?? 0;
                       final repo = CalificacionRepository();
-                      await repo.sincronizarCalificaciones(cursoIdInt);
-                      
-                      // Refrescar todos los providers
-                      ref.invalidate(calificacionesCursoProvider(cursoIdInt));
-                      
+
+                      // Mostrar indicador de carga
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Calificaciones sincronizadas correctamente'),
+                            content: Text('Sincronizando calificaciones...'),
+                            backgroundColor: Colors.blue,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+
+                      await repo.sincronizarCalificaciones(cursoIdInt);
+
+                      // Refrescar todos los providers
+                      ref.invalidate(calificacionesCursoProvider(cursoIdInt));
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Calificaciones sincronizadas correctamente'),
                             backgroundColor: Colors.green,
                           ),
                         );
                       }
                     } catch (e) {
+                      debugPrint('Error al sincronizar calificaciones: $e');
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Error al sincronizar: $e'),
+                            backgroundColor: Colors.red,
                           ),
                         );
                       }
@@ -293,66 +328,83 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Dashboard existente
-              Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                children: [
-                  _InfoBox(
-                    icon: LucideIcons.graduationCap,
-                    label: 'Promedio general',
-                    value: promedioGeneral.toStringAsFixed(2),
-                    color: Colors.blue,
-                  ),
-                  _InfoBox(
-                    icon: LucideIcons.check,
-                    label: 'Aprobados',
-                    value: '$totalAprobados',
-                    color: Colors.green,
-                  ),
-                  _InfoBox(
-                    icon: LucideIcons.x,
-                    label: 'Reprobados',
-                    value: '$totalReprobados',
-                    color: Colors.red,
-                  ),
-
-                ],
+              // Dashboard con scroll horizontal
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _InfoBox(
+                      icon: LucideIcons.graduationCap,
+                      label: 'Promedio general',
+                      value: promedioGeneral.toStringAsFixed(2),
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(width: 16),
+                    _InfoBox(
+                      icon: LucideIcons.check,
+                      label: 'Aprobados',
+                      value: '$totalAprobados',
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 16),
+                    _InfoBox(
+                      icon: LucideIcons.x,
+                      label: 'Reprobados',
+                      value: '$totalReprobados',
+                      color: Colors.red,
+                    ),
+                    const SizedBox(width: 16),
+                    _InfoBox(
+                      icon: LucideIcons.users,
+                      label: 'Total estudiantes',
+                      value: '$totalEstudiantes',
+                      color: Colors.purple,
+                    ),
+                    const SizedBox(width: 16),
+                    _InfoBox(
+                      icon: LucideIcons.fileText,
+                      label: 'Total evaluaciones',
+                      value: '${evaluaciones.length}',
+                      color: Colors.indigo,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-            // --- Filtros y búsqueda ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'Buscar estudiante',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      onChanged: (v) => setState(() => _filtroTexto = v),
-                    ),
+        // --- Filtros y búsqueda ---
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Buscar estudiante',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                    isDense: true,
                   ),
-                  const SizedBox(width: 12),
-                  DropdownButton<String>(
-                    value: _filtroEstado,
-                    items: const [
-                      DropdownMenuItem(value: 'Todos', child: Text('Todos')),
-                      DropdownMenuItem(value: 'Aprobado', child: Text('Aprobados')),
-                      DropdownMenuItem(value: 'Reprobado', child: Text('Reprobados')),
-                    ],
-                    onChanged: (v) => setState(() => _filtroEstado = v ?? 'Todos'),
-                    ),
-                  ],
+                  onChanged: (v) => setState(() => _filtroTexto = v),
                 ),
-            ),
-            const SizedBox(height: 8),
-        // --- Tabla responsiva ---
+              ),
+              const SizedBox(width: 12),
+              DropdownButton<String>(
+                value: _filtroEstado,
+                items: const [
+                  DropdownMenuItem(value: 'Todos', child: Text('Todos')),
+                  DropdownMenuItem(value: 'Aprobado', child: Text('Aprobados')),
+                  DropdownMenuItem(
+                      value: 'Reprobado', child: Text('Reprobados')),
+                ],
+                onChanged: (v) => setState(() => _filtroEstado = v ?? 'Todos'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+                // --- Tabla responsiva ---
         Expanded(
           child: esMovil
               ? ListView.builder(
@@ -364,134 +416,101 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                       estudiante: estudiante,
                       evaluaciones: evaluaciones,
                       mapaCalificaciones: mapaCalificaciones,
-                      onEditarNota: (evalId, calificacion, eval) => _mostrarDialogoNota(context, estudiante, evalId, calificacion, eval),
+                      onEditarNota: (evalId, calificacion, eval) =>
+                          _mostrarDialogoNota(
+                              context, estudiante, evalId, calificacion, eval),
                     );
                   },
                 )
-               : SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: [
-              const DataColumn(label: Text('Estudiante', style: TextStyle(fontWeight: FontWeight.bold))),
-              ...evaluaciones.map((eval) => DataColumn(
-                label: Tooltip(
-                  message: '${eval.titulo} (${eval.tipo})',
-                  child: Row(
-                    children: [
-                      Text(
-                        eval.titulo.length > 15 ? '${eval.titulo.substring(0, 12)}...' : eval.titulo,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 4),
+              : Column(
+                  children: [
+                    // Indicador de scroll horizontal
+                    if (evaluaciones.length > 3)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
-                          color: eval.tipo == 'Examen' ? Colors.purple.shade50 : Colors.blue.shade50,
+                          color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
                         ),
-                        child: Text(eval.tipo, style: TextStyle(fontSize: 10, color: eval.tipo == 'Examen' ? Colors.purple : Colors.blue)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.swipe_left,
+                              color: Colors.blue.shade600,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Desliza horizontalmente para ver todas las evaluaciones',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
+                    // Tabla con scroll horizontal mejorado
+                    Expanded(
+                      child: _TablaCalificacionesDesktop(
+                        estudiantes: estudiantesFiltrados,
+                        evaluaciones: evaluaciones,
+                        mapaCalificaciones: mapaCalificaciones,
+                        onEditarNota: _mostrarDialogoNota,
+                      ),
+                    ),
+                  ],
                 ),
-              )),
-              const DataColumn(label: Text('Promedio', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: estudiantesFiltrados.map((estudiante) {
-              final promedio = _calcularPromedioEstudiante(estudiante, evaluaciones, mapaCalificaciones);
-              return DataRow(
-                cells: [
-                  DataCell(
-                    Row(
-                      children: [
-                        AvatarWidget(
-                          fotoUrl: estudiante.fotoPerfilUrl,
-                          nombreCompleto: estudiante.nombreCompleto,
-                          radio: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(estudiante.nombreCompleto)),
-                      ],
-                    ),
-                  ),
-                  ...evaluaciones.map((eval) {
-                    final key = '${estudiante.id}-${eval.id}';
-                    final calificacion = mapaCalificaciones[key];
-                    return DataCell(
-                      GestureDetector(
-                        onTap: () => _mostrarDialogoNota(context, estudiante, eval.id, calificacion, eval),
-                        child: _NotaCell(calificacion: calificacion, puntosMaximos: eval.puntosMaximos),
-                      ),
-                    );
-                  }),
-                  DataCell(Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: promedio >= 11
-                          ? Colors.green.shade50
-                          : Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      promedio.toStringAsFixed(2),
-                      style: TextStyle(
-                        color: promedio >= 11
-                            ? Colors.green
-                            : Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  )),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
         ),
       ],
     );
   }
 
   double _calcularPromedioEstudiante(
-    EstudianteAdmin estudiante, 
-    List<EvaluacionData> evaluaciones, 
-    Map<String, CalificacionUnificada> mapaCalificaciones
-  ) {
+      EstudianteAdmin estudiante,
+      List<EvaluacionData> evaluaciones,
+      Map<String, CalificacionUnificada> mapaCalificaciones) {
     double suma = 0;
     final int totalEvaluaciones = evaluaciones.length;
-    
+
     for (final evaluacion in evaluaciones) {
       final key = '${estudiante.id}-${evaluacion.id}';
       final calificacion = mapaCalificaciones[key];
-      
+
       if (calificacion != null) {
         // Convertir puntos a nota sobre 20
-        final notaSobre20 = (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
+        final notaSobre20 =
+            (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
         suma += notaSobre20;
       } else {
         // Si no tiene calificación, se cuenta como 0
         suma += 0.0;
       }
     }
-    
+
     // Siempre retornar un promedio (0 si no hay evaluaciones)
     return totalEvaluaciones > 0 ? suma / totalEvaluaciones : 0.0;
   }
 
   Future<void> _mostrarDialogoNota(
-    BuildContext context, 
-    EstudianteAdmin estudiante, 
-    String evalId, 
-    CalificacionUnificada? calificacionExistente, 
-    EvaluacionData evaluacion
-  ) async {
+      BuildContext context,
+      EstudianteAdmin estudiante,
+      String evalId,
+      CalificacionUnificada? calificacionExistente,
+      EvaluacionData evaluacion) async {
     final puntosController = TextEditingController(
-      text: calificacionExistente?.puntosObtenidos.toString() ?? ''
-    );
+        text: calificacionExistente?.puntosObtenidos.toString() ?? '');
     final comentarioController = TextEditingController(
-      text: '' // Podríamos añadir comentarios en el futuro
-    );
-    
+        text: '' // Podríamos añadir comentarios en el futuro
+        );
+
     final resultado = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) {
@@ -513,7 +532,8 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                   Expanded(
                     child: Text(
                       estudiante.nombreCompleto,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.normal),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.normal),
                     ),
                   ),
                 ],
@@ -537,14 +557,20 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: evaluacion.tipo == 'Examen' ? Colors.purple.shade50 : Colors.blue.shade50,
+                  color: evaluacion.tipo == 'Examen'
+                      ? Colors.purple.shade50
+                      : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      evaluacion.tipo == 'Examen' ? LucideIcons.fileText : LucideIcons.clipboard,
-                      color: evaluacion.tipo == 'Examen' ? Colors.purple : Colors.blue,
+                      evaluacion.tipo == 'Examen'
+                          ? LucideIcons.fileText
+                          : LucideIcons.clipboard,
+                      color: evaluacion.tipo == 'Examen'
+                          ? Colors.purple
+                          : Colors.blue,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
@@ -556,12 +582,15 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
                             evaluacion.tipo,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: evaluacion.tipo == 'Examen' ? Colors.purple : Colors.blue,
+                              color: evaluacion.tipo == 'Examen'
+                                  ? Colors.purple
+                                  : Colors.blue,
                             ),
                           ),
                           Text(
                             'Fecha límite: ${evaluacion.fechaEntrega.day}/${evaluacion.fechaEntrega.month}/${evaluacion.fechaEntrega.year}',
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -585,20 +614,23 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
             ElevatedButton(
               onPressed: () {
                 final puntos = double.tryParse(puntosController.text);
-                if (puntos != null && puntos >= 0 && puntos <= evaluacion.puntosMaximos) {
+                if (puntos != null &&
+                    puntos >= 0 &&
+                    puntos <= evaluacion.puntosMaximos) {
                   Navigator.of(context).pop({
                     'puntos': puntos,
                     'comentario': comentarioController.text,
                   });
                 }
               },
-              child: Text(calificacionExistente != null ? 'Actualizar' : 'Guardar'),
+              child: Text(
+                  calificacionExistente != null ? 'Actualizar' : 'Guardar'),
             ),
           ],
         );
       },
     );
-    
+
     if (resultado != null && mounted) {
       if (resultado['eliminar'] == true) {
         await _eliminarCalificacion(calificacionExistente!);
@@ -622,28 +654,36 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     try {
       final repo = CalificacionRepository();
       final cursoIdInt = int.tryParse(widget.cursoId) ?? 0;
-      
+
       if (calificacionExistente != null) {
         // Actualizar calificación existente
         final calificacion = Calificacion(
           id: calificacionExistente.id,
           estudianteId: estudiante.id,
-          tareaId: evaluacion.tipo == 'Tarea' ? int.tryParse(evaluacion.id) : null,
-          examenId: evaluacion.tipo == 'Examen' ? int.tryParse(evaluacion.id) : null,
+          tareaId:
+              evaluacion.tipo == 'Tarea' ? int.tryParse(evaluacion.id) : null,
+          examenId:
+              evaluacion.tipo == 'Examen' ? int.tryParse(evaluacion.id) : null,
           cursoId: cursoIdInt,
           puntosObtenidos: puntosObtenidos,
           puntosTotales: evaluacion.puntosMaximos,
-          fechaCalificacion: calificacionExistente.fechaCalificacion, // Mantener fecha original
-          fechaCreacion: calificacionExistente.fechaCalificacion, // Usar fecha de calificación como fecha de creación
-          fechaActualizacion: DateTime.now(), // Fecha actual como fecha de actualización
+          fechaCalificacion: calificacionExistente
+              .fechaCalificacion, // Mantener fecha original
+          fechaCreacion: calificacionExistente
+              .fechaCalificacion, // Usar fecha de calificación como fecha de creación
+          fechaActualizacion:
+              DateTime.now(), // Fecha actual como fecha de actualización
         );
-        await repo.actualizarCalificacion(calificacionExistente.id, calificacion);
+        await repo.actualizarCalificacion(
+            calificacionExistente.id, calificacion);
       } else {
         // Crear nueva calificación
         final calificacion = Calificacion.crear(
           estudianteId: estudiante.id,
-          tareaId: evaluacion.tipo == 'Tarea' ? int.tryParse(evaluacion.id) : null,
-          examenId: evaluacion.tipo == 'Examen' ? int.tryParse(evaluacion.id) : null,
+          tareaId:
+              evaluacion.tipo == 'Tarea' ? int.tryParse(evaluacion.id) : null,
+          examenId:
+              evaluacion.tipo == 'Examen' ? int.tryParse(evaluacion.id) : null,
           cursoId: cursoIdInt,
           puntosObtenidos: puntosObtenidos,
           puntosTotales: evaluacion.puntosMaximos,
@@ -651,15 +691,16 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
         );
         await repo.crearCalificacion(calificacion);
       }
-      
+
       // Refrescar datos
       // ignore: unused_result
       ref.refresh(calificacionesCursoProvider(cursoIdInt));
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Nota ${calificacionExistente != null ? 'actualizada' : 'guardada'} correctamente'),
+            content: Text(
+                'Nota ${calificacionExistente != null ? 'actualizada' : 'guardada'} correctamente'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -681,33 +722,31 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
   Future<void> _eliminarCalificacion(CalificacionUnificada calificacion) async {
     try {
       final repo = CalificacionRepository();
-      
+
       // Si la calificación viene de una entrega, no la eliminamos de la tabla
       // Solo si viene de la tabla de calificaciones
       if (calificacion.fuente == 'tabla_calificaciones') {
         await repo.eliminarCalificacion(calificacion.id);
       }
-      
+
       // Refrescar datos
       final cursoIdInt = int.tryParse(widget.cursoId) ?? 0;
       // ignore: unused_result
       ref.refresh(calificacionesCursoProvider(cursoIdInt));
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Calificación eliminada correctamente'), 
-            backgroundColor: Colors.orange
-          ),
+              content: Text('Calificación eliminada correctamente'),
+              backgroundColor: Colors.orange),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al eliminar la calificación: $e'), 
-            backgroundColor: Colors.red
-          ),
+              content: Text('Error al eliminar la calificación: $e'),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -715,7 +754,11 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
 }
 
 class _InfoBox extends StatelessWidget {
-  const _InfoBox({required this.icon, required this.label, required this.value, required this.color});
+  const _InfoBox(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color});
   final IconData icon;
   final String label;
   final String value;
@@ -737,8 +780,11 @@ class _InfoBox extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-              Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+              Text(label,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold, color: color)),
             ],
           ),
         ],
@@ -749,10 +795,11 @@ class _InfoBox extends StatelessWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties..add(DiagnosticsProperty<IconData>('icon', icon))
-    ..add(StringProperty('label', label))
-    ..add(StringProperty('value', value))
-    ..add(ColorProperty('color', color));
+    properties
+      ..add(DiagnosticsProperty<IconData>('icon', icon))
+      ..add(StringProperty('label', label))
+      ..add(StringProperty('value', value))
+      ..add(ColorProperty('color', color));
   }
 }
 
@@ -777,9 +824,10 @@ class _NotaCell extends StatelessWidget {
       );
     }
 
-    final notaSobre20 = (calificacion!.puntosObtenidos / calificacion!.puntosTotales) * 20;
+    final notaSobre20 =
+        (calificacion!.puntosObtenidos / calificacion!.puntosTotales) * 20;
     final color = notaSobre20 >= 11 ? Colors.green : Colors.red;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -812,8 +860,10 @@ class _NotaCell extends StatelessWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties..add(DiagnosticsProperty<CalificacionUnificada?>('calificacion', calificacion))
-    ..add(DoubleProperty('puntosMaximos', puntosMaximos));
+    properties
+      ..add(DiagnosticsProperty<CalificacionUnificada?>(
+          'calificacion', calificacion))
+      ..add(DoubleProperty('puntosMaximos', puntosMaximos));
   }
 }
 
@@ -824,11 +874,12 @@ class _EstudianteCard extends StatelessWidget {
     required this.mapaCalificaciones,
     required this.onEditarNota,
   });
-  
+
   final EstudianteAdmin estudiante;
   final List<EvaluacionData> evaluaciones;
   final Map<String, CalificacionUnificada> mapaCalificaciones;
-  final void Function(String evalId, CalificacionUnificada? calificacion, EvaluacionData eval) onEditarNota;
+  final void Function(String evalId, CalificacionUnificada? calificacion,
+      EvaluacionData eval) onEditarNota;
 
   @override
   Widget build(BuildContext context) {
@@ -866,7 +917,7 @@ class _EstudianteCard extends StatelessWidget {
               children: evaluaciones.map((eval) {
                 final key = '${estudiante.id}-${eval.id}';
                 final calificacion = mapaCalificaciones[key];
-                
+
                 return Container(
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   padding: const EdgeInsets.all(12),
@@ -886,15 +937,20 @@ class _EstudianteCard extends StatelessWidget {
                             Row(
                               children: [
                                 Icon(
-                                  eval.tipo == 'Examen' ? LucideIcons.fileText : LucideIcons.clipboard,
+                                  eval.tipo == 'Examen'
+                                      ? LucideIcons.fileText
+                                      : LucideIcons.clipboard,
                                   size: 16,
-                                  color: eval.tipo == 'Examen' ? Colors.purple : Colors.blue,
+                                  color: eval.tipo == 'Examen'
+                                      ? Colors.purple
+                                      : Colors.blue,
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     eval.titulo,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
@@ -903,16 +959,21 @@ class _EstudianteCard extends StatelessWidget {
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: eval.tipo == 'Examen' ? Colors.purple.shade100 : Colors.blue.shade100,
+                                    color: eval.tipo == 'Examen'
+                                        ? Colors.purple.shade100
+                                        : Colors.blue.shade100,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
                                     eval.tipo,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: eval.tipo == 'Examen' ? Colors.purple : Colors.blue,
+                                      color: eval.tipo == 'Examen'
+                                          ? Colors.purple
+                                          : Colors.blue,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -920,7 +981,8 @@ class _EstudianteCard extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Text(
                                   'Max: ${eval.puntosMaximos}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  style: const TextStyle(
+                                      fontSize: 12, color: Colors.grey),
                                 ),
                               ],
                             ),
@@ -937,7 +999,9 @@ class _EstudianteCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: Colors.grey.shade300),
                           ),
-                          child: _NotaCell(calificacion: calificacion, puntosMaximos: eval.puntosMaximos),
+                          child: _NotaCell(
+                              calificacion: calificacion,
+                              puntosMaximos: eval.puntosMaximos),
                         ),
                       ),
                     ],
@@ -955,8 +1019,9 @@ class _EstudianteCard extends StatelessWidget {
     if (calificacion == null) {
       return Colors.grey.shade50;
     }
-    
-    final notaSobre20 = (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
+
+    final notaSobre20 =
+        (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
     if (notaSobre20 >= 11) {
       return Colors.green.shade50;
     } else {
@@ -968,8 +1033,9 @@ class _EstudianteCard extends StatelessWidget {
     if (calificacion == null) {
       return Colors.grey.shade200;
     }
-    
-    final notaSobre20 = (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
+
+    final notaSobre20 =
+        (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
     if (notaSobre20 >= 11) {
       return Colors.green.shade200;
     } else {
@@ -980,12 +1046,16 @@ class _EstudianteCard extends StatelessWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties..add(DiagnosticsProperty('estudiante', estudiante))
-    ..add(IterableProperty<EvaluacionData>('evaluaciones', evaluaciones))
-    ..add(DiagnosticsProperty<Map<String, CalificacionUnificada>>('mapaCalificaciones', mapaCalificaciones))
-    ..add(ObjectFlagProperty<void Function(String evalId, CalificacionUnificada? calificacion, EvaluacionData eval)>.has('onEditarNota', onEditarNota));
+    properties
+      ..add(DiagnosticsProperty('estudiante', estudiante))
+      ..add(IterableProperty<EvaluacionData>('evaluaciones', evaluaciones))
+      ..add(DiagnosticsProperty<Map<String, CalificacionUnificada>>(
+          'mapaCalificaciones', mapaCalificaciones))
+      ..add(ObjectFlagProperty<
+          void Function(String evalId, CalificacionUnificada? calificacion,
+              EvaluacionData eval)>.has('onEditarNota', onEditarNota));
   }
-} 
+}
 
 class EvaluacionData {
   EvaluacionData({
@@ -995,10 +1065,257 @@ class EvaluacionData {
     required this.puntosMaximos,
     required this.fechaEntrega,
   });
-  
+
   final String id;
   final String titulo;
   final String tipo;
   final double puntosMaximos;
   final DateTime fechaEntrega;
-} 
+}
+
+class _TablaCalificacionesDesktop extends StatelessWidget {
+  const _TablaCalificacionesDesktop({
+    required this.estudiantes,
+    required this.evaluaciones,
+    required this.mapaCalificaciones,
+    required this.onEditarNota,
+  });
+
+  final List<EstudianteAdmin> estudiantes;
+  final List<EvaluacionData> evaluaciones;
+  final Map<String, CalificacionUnificada> mapaCalificaciones;
+  final Function(BuildContext context, EstudianteAdmin estudiante, String evalId, CalificacionUnificada? calificacion, EvaluacionData eval) onEditarNota;
+
+  @override
+  Widget build(BuildContext context) {
+    // Calcular ancho total necesario
+    final anchoEstudiante = 250.0;
+    final anchoEvaluacion = 150.0;
+    final anchoPromedio = 120.0;
+    final anchoTotal = anchoEstudiante + (evaluaciones.length * anchoEvaluacion) + anchoPromedio + 32; // 32 para padding
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: anchoTotal,
+        child: Column(
+          children: [
+            // Encabezados de columna
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Columna Estudiante
+                  Container(
+                    width: anchoEstudiante,
+                    padding: const EdgeInsets.all(16),
+                    child: const Text(
+                      'Estudiante',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  // Columnas de evaluaciones
+                  ...evaluaciones.map((eval) => Container(
+                    width: anchoEvaluacion,
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        Text(
+                          eval.titulo.length > 20
+                              ? '${eval.titulo.substring(0, 17)}...'
+                              : eval.titulo,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: eval.tipo == 'Examen'
+                                ? Colors.purple.shade50
+                                : Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            eval.tipo,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: eval.tipo == 'Examen'
+                                  ? Colors.purple
+                                  : Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+                  // Columna Promedio
+                  Container(
+                    width: anchoPromedio,
+                    padding: const EdgeInsets.all(16),
+                    child: const Text(
+                      'Promedio',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Filas de estudiantes
+            ...estudiantes.map((estudiante) {
+              final promedio = _calcularPromedioEstudiante(
+                estudiante,
+                evaluaciones,
+                mapaCalificaciones,
+              );
+              
+              return Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade200),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Celda del estudiante
+                    Container(
+                      width: anchoEstudiante,
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          AvatarWidget(
+                            fotoUrl: estudiante.fotoPerfilUrl,
+                            nombreCompleto: estudiante.nombreCompleto,
+                            radio: 16,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              estudiante.nombreCompleto,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Celdas de evaluaciones
+                    ...evaluaciones.map((eval) {
+                      final key = '${estudiante.id}-${eval.id}';
+                      final calificacion = mapaCalificaciones[key];
+                      
+                      return Container(
+                        width: anchoEvaluacion,
+                        padding: const EdgeInsets.all(12),
+                        child: GestureDetector(
+                          onTap: () => onEditarNota(
+                            context,
+                            estudiante,
+                            eval.id,
+                            calificacion,
+                            eval,
+                          ),
+                          child: _NotaCell(
+                            calificacion: calificacion,
+                            puntosMaximos: eval.puntosMaximos,
+                          ),
+                        ),
+                      );
+                    }),
+                    // Celda del promedio
+                    Container(
+                      width: anchoPromedio,
+                      padding: const EdgeInsets.all(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: promedio >= 11
+                              ? Colors.green.shade50
+                              : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          promedio.toStringAsFixed(2),
+                          style: TextStyle(
+                            color: promedio >= 11
+                                ? Colors.green
+                                : Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _calcularPromedioEstudiante(
+    EstudianteAdmin estudiante,
+    List<EvaluacionData> evaluaciones,
+    Map<String, CalificacionUnificada> mapaCalificaciones,
+  ) {
+    double suma = 0;
+    final int totalEvaluaciones = evaluaciones.length;
+
+    for (final evaluacion in evaluaciones) {
+      final key = '${estudiante.id}-${evaluacion.id}';
+      final calificacion = mapaCalificaciones[key];
+
+      if (calificacion != null) {
+        // Convertir puntos a nota sobre 20
+        final notaSobre20 =
+            (calificacion.puntosObtenidos / calificacion.puntosTotales) * 20;
+        suma += notaSobre20;
+      } else {
+        // Si no tiene calificación, se cuenta como 0
+        suma += 0.0;
+      }
+    }
+
+    // Siempre retornar un promedio (0 si no hay evaluaciones)
+    return totalEvaluaciones > 0 ? suma / totalEvaluaciones : 0.0;
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties
+      ..add(IterableProperty<EstudianteAdmin>('estudiantes', estudiantes))
+      ..add(IterableProperty<EvaluacionData>('evaluaciones', evaluaciones))
+      ..add(DiagnosticsProperty<Map<String, CalificacionUnificada>>(
+        'mapaCalificaciones',
+        mapaCalificaciones,
+      ))
+      ..add(ObjectFlagProperty<Function>.has('onEditarNota', onEditarNota));
+  }
+}
