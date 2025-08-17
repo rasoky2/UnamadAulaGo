@@ -80,12 +80,12 @@ class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
     final esMovil = ancho < 700;
     
     if (_cargando) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
             Text(
               'Cargando perfil del estudiante...',
               style: TextStyle(
@@ -154,9 +154,9 @@ class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
         // Avatar con foto de perfil
         FotoPerfilUploadWidget(
           usuarioId: usuario.id.toString(),
-          nombreCompleto: usuario.nombreCompleto,
+          nombreCompleto: _estudiante?.nombreCompleto ?? usuario.nombreCompleto,
           tipoUsuario: 'estudiante',
-          fotoActualUrl: usuario.fotoPerfilUrl,
+          fotoActualUrl: _estudiante?.fotoPerfilUrl ?? usuario.fotoPerfilUrl,
           radio: esMovil ? 30 : 40,
           onFotoSubida: (nuevaUrl) async {
             // Actualizar la foto en la base de datos
@@ -189,7 +189,7 @@ class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                usuario.nombreCompleto,
+                _estudiante?.nombreCompleto ?? usuario.nombreCompleto,
                 style: TextStyle(
                   fontSize: esMovil ? 18 : 22,
                   fontWeight: FontWeight.bold,
@@ -200,7 +200,7 @@ class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Código: ${usuario.codigoUsuario}',
+                'Código: ${_estudiante?.codigoEstudiante ?? usuario.codigoUsuario}',
                 style: TextStyle(
                   fontSize: esMovil ? 13 : 14,
                   color: AppConstants.textSecondary,
@@ -216,17 +216,11 @@ class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
   Widget _construirInformacionUsuario(usuario, bool esMovil) {
     return Column(
       children: [
+        // Información básica del usuario
         _construirInfoItem(
           icon: LucideIcons.mail,
           label: 'Correo electrónico',
           value: usuario.correoElectronico ?? 'No disponible',
-          esMovil: esMovil,
-        ),
-        const SizedBox(height: 16),
-        _construirInfoItem(
-          icon: LucideIcons.userCheck,
-          label: 'Rol',
-          value: usuario.rol,
           esMovil: esMovil,
         ),
         const SizedBox(height: 16),
@@ -237,53 +231,237 @@ class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
           esMovil: esMovil,
           valueColor: usuario.activo ? Colors.green : Colors.red,
         ),
-        // Información del estudiante desde el repositorio
+        
+        // Información detallada del estudiante desde el repositorio
         if (_estudiante != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
+          _construirSeccionEstudiante(esMovil),
+          const SizedBox(height: 24),
+          _construirSeccionEstadisticas(esMovil),
+        ],
+      ],
+    );
+  }
+
+  Widget _construirSeccionEstudiante(bool esMovil) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Título de la sección
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppConstants.primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                LucideIcons.graduationCap,
+                size: 16,
+                color: AppConstants.primaryColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Información Académica',
+                style: TextStyle(
+                  fontSize: esMovil ? 14 : 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.primaryColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Código de estudiante
+        _construirInfoItem(
+          icon: LucideIcons.hash,
+          label: 'Código de estudiante',
+          value: _estudiante!.codigoEstudiante,
+          esMovil: esMovil,
+        ),
+        const SizedBox(height: 16),
+        
+        // Carrera
+        _construirInfoItem(
+          icon: LucideIcons.bookOpen,
+          label: 'Carrera',
+          value: _estudiante!.carreraNombre ?? 'Carrera no especificada',
+          esMovil: esMovil,
+        ),
+        const SizedBox(height: 16),
+        
+        // Semestre actual
+        _construirInfoItem(
+          icon: LucideIcons.calendar,
+          label: 'Semestre actual',
+          value: _estudiante!.semestreActual?.toString() ?? 'No especificado',
+          esMovil: esMovil,
+        ),
+        const SizedBox(height: 16),
+        
+        // Teléfono
+        _construirInfoItem(
+          icon: LucideIcons.phone,
+          label: 'Teléfono',
+          value: _estudiante!.telefono ?? 'No disponible',
+          esMovil: esMovil,
+        ),
+        const SizedBox(height: 16),
+        
+        // Dirección
+        _construirInfoItem(
+          icon: LucideIcons.mapPin,
+          label: 'Dirección',
+          value: _estudiante!.direccion ?? 'No disponible',
+          esMovil: esMovil,
+        ),
+        const SizedBox(height: 16),
+        
+        // Fecha de nacimiento
+        if (_estudiante!.fechaNacimiento != null) ...[
           _construirInfoItem(
-            icon: LucideIcons.graduationCap,
-            label: 'Carrera',
-            value: _estudiante!.carreraId.toString(),
+            icon: LucideIcons.cake,
+            label: 'Fecha de nacimiento',
+            value: _formatearFecha(_estudiante!.fechaNacimiento!),
             esMovil: esMovil,
           ),
           const SizedBox(height: 16),
+        ],
+        
+        // Fecha de ingreso
+        _construirInfoItem(
+          icon: LucideIcons.calendarDays,
+          label: 'Fecha de ingreso',
+          value: _estudiante!.fechaIngreso != null 
+              ? _formatearFecha(_estudiante!.fechaIngreso!)
+              : 'No especificada',
+          esMovil: esMovil,
+        ),
+        const SizedBox(height: 16),
+        
+        // Fecha de creación del registro
+        if (_estudiante!.fechaCreacion != null) ...[
           _construirInfoItem(
-            icon: LucideIcons.bookOpen,
-            label: 'Semestre actual',
-            value: _estudiante!.semestreActual.toString(),
+            icon: LucideIcons.clock,
+            label: 'Fecha de creación del registro',
+            value: _formatearFecha(_estudiante!.fechaCreacion!),
             esMovil: esMovil,
           ),
           const SizedBox(height: 16),
+        ],
+        
+        // Fecha de última actualización
+        if (_estudiante!.fechaActualizacion != null) ...[
           _construirInfoItem(
-            icon: LucideIcons.phone,
-            label: 'Teléfono',
-            value: _estudiante!.telefono ?? 'No disponible',
-            esMovil: esMovil,
-          ),
-          const SizedBox(height: 16),
-          _construirInfoItem(
-            icon: LucideIcons.mapPin,
-            label: 'Dirección',
-            value: _estudiante!.direccion ?? 'No disponible',
-            esMovil: esMovil,
-          ),
-          if (_estudiante!.fechaNacimiento != null) ...[
-            const SizedBox(height: 16),
-            _construirInfoItem(
-              icon: LucideIcons.calendar,
-              label: 'Fecha de nacimiento',
-              value: _estudiante!.fechaNacimiento!.toString().substring(0, 10),
-              esMovil: esMovil,
-            ),
-          ],
-          const SizedBox(height: 16),
-          _construirInfoItem(
-            icon: LucideIcons.calendarDays,
-            label: 'Fecha de ingreso',
-            value: _estudiante!.fechaIngreso.toString().substring(0, 10),
+            icon: LucideIcons.refreshCw,
+            label: 'Última actualización',
+            value: _formatearFecha(_estudiante!.fechaActualizacion!),
             esMovil: esMovil,
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _construirSeccionEstadisticas(bool esMovil) {
+    if (_estudiante!.estadisticas == null) {
+      return const SizedBox.shrink();
+    }
+
+    final stats = _estudiante!.estadisticas!;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Título de la sección
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.blue.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.bar_chart,
+                size: 16,
+                color: Colors.blue,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Estadísticas Académicas',
+                style: TextStyle(
+                  fontSize: esMovil ? 14 : 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Cursos activos
+        _construirInfoItem(
+          icon: LucideIcons.bookOpen,
+          label: 'Cursos activos',
+          value: stats.cursosActivos.toString(),
+          esMovil: esMovil,
+          valueColor: Colors.green,
+        ),
+        const SizedBox(height: 16),
+        
+        // Créditos totales
+        _construirInfoItem(
+          icon: LucideIcons.award,
+          label: 'Créditos totales',
+          value: stats.creditosTotales.toString(),
+          esMovil: esMovil,
+          valueColor: Colors.blue,
+        ),
+        const SizedBox(height: 16),
+        
+        // Promedio general
+        _construirInfoItem(
+          icon: LucideIcons.trendingUp,
+          label: 'Promedio general',
+          value: stats.promedioGeneral > 0 ? stats.promedioGeneral.toStringAsFixed(2) : 'No disponible',
+          esMovil: esMovil,
+          valueColor: stats.promedioGeneral >= 11 ? Colors.green : Colors.orange,
+        ),
+        const SizedBox(height: 16),
+        
+        // Porcentaje de asistencia
+        _construirInfoItem(
+          icon: Icons.person_pin,
+          label: 'Porcentaje de asistencia',
+          value: stats.porcentajeAsistencia > 0 ? '${stats.porcentajeAsistencia.toStringAsFixed(1)}%' : 'No disponible',
+          esMovil: esMovil,
+          valueColor: stats.porcentajeAsistencia >= 80 ? Colors.green : Colors.orange,
+        ),
+        const SizedBox(height: 16),
+        
+        // Tareas completadas
+        _construirInfoItem(
+          icon: Icons.check_circle,
+          label: 'Tareas completadas',
+          value: stats.tareasCompletadas.toString(),
+          esMovil: esMovil,
+          valueColor: Colors.green,
+        ),
+        const SizedBox(height: 16),
+        
+        // Tareas pendientes
+        _construirInfoItem(
+          icon: LucideIcons.clock,
+          label: 'Tareas pendientes',
+          value: stats.tareasPendientes.toString(),
+          esMovil: esMovil,
+          valueColor: stats.tareasPendientes > 0 ? Colors.orange : Colors.green,
+        ),
       ],
     );
   }
@@ -380,7 +558,7 @@ class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
             label: const Text('Actualizar datos'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppConstants.primaryColor,
-              side: BorderSide(color: AppConstants.primaryColor),
+              side: const BorderSide(color: AppConstants.primaryColor),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -404,6 +582,10 @@ class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
       context: context,
       builder: (dialogContext) => _DialogoEditarPerfilWidget(esMovil: esMovil),
     );
+  }
+
+  String _formatearFecha(DateTime fecha) {
+    return '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
   }
 
   Widget _construirBotonCerrarSesion(BuildContext context, WidgetRef ref, bool esMovil) {

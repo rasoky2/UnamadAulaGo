@@ -349,10 +349,60 @@ class EntregaRepository extends BaseRepository<ModeloEntrega> {
           .map((json) => json)
           .toList();
       
-      debugPrint('[EntregaRepository] ✅ ${entregasConEstudiante.length} entregas con estudiante obtenidas');
+      debugPrint('[EntregaRepository] ✅ $entregasConEstudiante.length entregas con estudiante obtenidas');
       return entregasConEstudiante;
     } catch (e) {
       debugPrint('[EntregaRepository] ❌ Error al obtener entregas con estudiante: $e');
+      rethrow;
+    }
+  }
+
+  /// Elimina todas las entregas asociadas a una tarea específica
+  /// Útil para eliminación en cascada cuando se elimina una tarea
+  Future<bool> eliminarEntregasPorTarea(int tareaId) async {
+    try {
+      debugPrint('[EntregaRepository] 🗑️ Eliminando todas las entregas para tarea: $tareaId');
+      
+      // 1. Obtener todas las entregas de la tarea
+      final entregas = await obtenerEntregasPorTarea(tareaId);
+      debugPrint('[EntregaRepository] 📋 $entregas.length entregas encontradas para eliminar');
+      
+      if (entregas.isEmpty) {
+        debugPrint('[EntregaRepository] ✅ No hay entregas para eliminar');
+        return true;
+      }
+      
+      // 2. Eliminar archivos de storage y entregas de la base de datos
+      int entregasEliminadas = 0;
+      for (final entrega in entregas) {
+        try {
+          // Eliminar archivos adjuntos del storage
+          for (final archivo in entrega.archivosAdjuntos) {
+            try {
+              await _storageRepo.eliminarArchivoEntrega(archivo.urlArchivo);
+              debugPrint('[EntregaRepository] ✅ Archivo eliminado: ${archivo.nombreOriginal}');
+            } catch (e) {
+              debugPrint('[EntregaRepository] ⚠️ Error al eliminar archivo: ${archivo.nombreOriginal} - $e');
+              // Continuar con los demás archivos
+            }
+          }
+          
+          // Eliminar la entrega de la base de datos
+          await eliminar(entrega.id.toString());
+          entregasEliminadas++;
+          debugPrint('[EntregaRepository] ✅ Entrega $entrega.id eliminada');
+          
+        } catch (e) {
+          debugPrint('[EntregaRepository] ⚠️ Error al eliminar entrega ${entrega.id}: $e');
+          // Continuar con las demás entregas
+        }
+      }
+      
+      debugPrint('[EntregaRepository] ✅ $entregasEliminadas/$entregas.length entregas eliminadas exitosamente');
+      return entregasEliminadas == entregas.length;
+      
+    } catch (e) {
+      debugPrint('[EntregaRepository] ❌ Error al eliminar entregas por tarea: $e');
       rethrow;
     }
   }

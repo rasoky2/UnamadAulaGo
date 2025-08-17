@@ -91,15 +91,15 @@ class _TareasWidgetState extends State<TareasWidget> {
             onRefresh: _refrescarTareas,
             child: FutureBuilder<List<ModeloTarea>>(
               future: repo.obtenerTareasPorCurso(widget.cursoId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return const Center(child: Text('Datos no cargados'));
-                }
-                final tareas = snapshot.data ?? [];
-                if (tareas.isEmpty) {
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return const Center(child: Text('Datos no cargados'));
+              }
+              final tareas = snapshot.data ?? [];
+              if (tareas.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -130,9 +130,9 @@ class _TareasWidgetState extends State<TareasWidget> {
                       ],
                     ),
                   );
-                }
-                return _construirTablaTareas(tareas);
-              },
+              }
+              return _construirTablaTareas(tareas);
+            },
             ),
           ),
         ],
@@ -143,85 +143,85 @@ class _TareasWidgetState extends State<TareasWidget> {
   Widget _construirTablaTareas(List<ModeloTarea> tareas) {
     return Builder(
       builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header de la tabla
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE91E63),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Header de la tabla
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFFE91E63),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
+            child: const Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    'Título',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
-              ),
-              child: const Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      'Título',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Fecha Límite',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      'Fecha Límite',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                ),
+                Expanded(
+                  child: Text(
+                    'Calificación',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  Expanded(
-                    child: Text(
-                      'Calificación',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
+                ),
+                Expanded(
+                  child: Text(
+                    'Acciones',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  Expanded(
-                    child: Text(
-                      'Acciones',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            
-            // Filas de tareas
-            ...List.generate(tareas.length, (index) {
-              final tarea = tareas[index];
+          ),
+          
+          // Filas de tareas
+          ...List.generate(tareas.length, (index) {
+            final tarea = tareas[index];
               return _construirFilaTarea(context, tarea, index);
-            }),
-          ],
+          }),
+        ],
         ),
       ),
     );
@@ -253,8 +253,8 @@ class _TareasWidgetState extends State<TareasWidget> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      tarea.titulo,
+                      Text(
+                        tarea.titulo,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -315,14 +315,14 @@ class _TareasWidgetState extends State<TareasWidget> {
                     children: [
                       ElevatedButton(
                         onPressed: () => _mostrarDetalleTarea(context, tarea),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF072D3E),
-                          foregroundColor: Colors.white,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF072D3E),
+                      foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
                         child: const Text('Ver', style: TextStyle(fontSize: 11)),
                       ),
                       const SizedBox(width: 8),

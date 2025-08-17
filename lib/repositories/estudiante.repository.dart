@@ -46,18 +46,31 @@ class EstudianteRepository extends BaseRepository<EstudianteAdmin> {
 
       final response = await supabase
           .from(tableName)
-          .select()
+          .select('''
+            *,
+            carreras!inner(
+              id,
+              nombre
+            )
+          ''')
           .eq('usuario_id', usuarioId)
           .maybeSingle();
 
       if (response != null) {
+        // Procesar la respuesta para incluir el nombre de la carrera
+        final estudianteData = Map<String, dynamic>.from(response);
+        if (response['carreras'] != null) {
+          final carrera = response['carreras'] as Map<String, dynamic>;
+          estudianteData['carrera_nombre'] = carrera['nombre'];
+        }
+        
         ApiLogger.logGet(
           table: tableName,
           statusCode: 200,
           response: {'found': true, 'usuario_id': usuarioId},
           filters: {'usuario_id': usuarioId},
         );
-        return EstudianteAdmin.fromJson(response);
+        return EstudianteAdmin.fromJson(estudianteData);
       } else {
         ApiLogger.logGet(
           table: tableName,
