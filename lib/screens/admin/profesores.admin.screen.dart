@@ -531,7 +531,9 @@ class _DialogoContrasenaProfesorState extends ConsumerState<_DialogoContrasenaPr
   }
 
   Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _guardando = true);
     try {
       await ProfesorRepository().actualizarContrasena(
@@ -539,18 +541,24 @@ class _DialogoContrasenaProfesorState extends ConsumerState<_DialogoContrasenaPr
         nuevaContrasena: _contrasenaController.text.trim(),
         usuarioId: widget.profesor.usuario.id,
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Contraseña actualizada'), backgroundColor: Colors.green),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     } finally {
-      if (mounted) setState(() => _guardando = false);
+      if (mounted) {
+        setState(() => _guardando = false);
+      }
     }
   }
 }

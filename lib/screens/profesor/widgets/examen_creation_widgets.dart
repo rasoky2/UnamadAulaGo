@@ -1,4 +1,5 @@
 import 'package:aulago/models/pregunta_examen.model.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 // ==================== CLASES AUXILIARES PARA CREACIÓN DE EXAMEN ====================
@@ -169,6 +170,14 @@ class PreguntaCard extends StatefulWidget {
 
   @override
   State<PreguntaCard> createState() => _PreguntaCardState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<PreguntaTemporal>('pregunta', pregunta));
+    properties.add(IntProperty('numero', numero));
+    properties.add(ObjectFlagProperty<VoidCallback?>.has('onEliminar', onEliminar));
+  }
 }
 
 class _PreguntaCardState extends State<PreguntaCard> {
@@ -254,7 +263,7 @@ class _PreguntaCardState extends State<PreguntaCard> {
               decoration: const InputDecoration(
                 labelText: 'Enunciado de la pregunta',
                 border: OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.help_outline),
+                prefixIcon: Icon(Icons.help_outline),
               ),
               maxLines: 2,
               onChanged: (_) => setState(() {}),
@@ -465,6 +474,16 @@ class ResumenItem extends StatelessWidget {
       ],
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<IconData>('icono', icono));
+    properties.add(StringProperty('titulo', titulo));
+    properties.add(StringProperty('valor', valor));
+    properties.add(ColorProperty('color', color));
+    properties.add(StringProperty('subtitle', subtitle));
+  }
 }
 
 /// Widget especializado para mostrar el resumen de puntos con indicadores
@@ -612,6 +631,14 @@ class ResumenPuntos extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(IterableProperty<PreguntaTemporal>('preguntas', preguntas))
+    ..add(DoubleProperty('puntosMaximos', puntosMaximos))
+    ..add(ObjectFlagProperty<VoidCallback?>.has('onDistribuirAutomaticamente', onDistribuirAutomaticamente));
+  }
 }
 
 /// Widget para mostrar un item en la revisión
@@ -651,6 +678,13 @@ class ItemRevision extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(StringProperty('titulo', titulo))
+    ..add(StringProperty('valor', valor));
   }
 }
 
@@ -738,6 +772,13 @@ class PreguntaRevision extends StatelessWidget {
             ),
       ],
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(IntProperty('numero', numero))
+    ..add(DiagnosticsProperty<PreguntaTemporal>('pregunta', pregunta));
   }
 }
 

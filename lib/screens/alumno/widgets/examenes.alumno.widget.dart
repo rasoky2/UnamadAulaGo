@@ -25,15 +25,15 @@ class ExamenesWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título con icono
-          Row(
+          const Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.quiz,
                 color: AppConstants.primaryColor,
                 size: 24,
               ),
-              const SizedBox(width: 12),
-              const Text(
+              SizedBox(width: 12),
+              Text(
                 'Exámenes',
                 style: TextStyle(
                   fontSize: 20,
@@ -268,6 +268,6 @@ class ExamenesWidget extends StatelessWidget {
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
     properties
-      ..add(StringProperty('cursoId', cursoId));
+      .add(StringProperty('cursoId', cursoId));
   }
 } 

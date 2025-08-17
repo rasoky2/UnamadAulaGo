@@ -1,7 +1,7 @@
 /// Modelo para representar un examen
 class ModeloExamen {
   const ModeloExamen({
-    required this.id,
+    this.id,
     required this.titulo,
     this.descripcion,
     this.instrucciones,
@@ -42,7 +42,8 @@ class ModeloExamen {
           : null,
     );
   }
-  final int id;
+  
+  final int? id;
   final String titulo;
   final String? descripcion;
   final String? instrucciones;
@@ -60,8 +61,7 @@ class ModeloExamen {
   final DateTime? fechaPublicacionResultados;
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> json = {
       'titulo': titulo,
       'descripcion': descripcion,
       'instrucciones': instrucciones,
@@ -78,6 +78,13 @@ class ModeloExamen {
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'fecha_publicacion_resultados': fechaPublicacionResultados?.toIso8601String(),
     };
+    
+    // Solo incluir el ID si existe (para actualizaciones)
+    if (id != null) {
+      json['id'] = id;
+    }
+    
+    return json;
   }
 
   @override

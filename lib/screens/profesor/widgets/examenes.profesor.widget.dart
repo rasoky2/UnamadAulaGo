@@ -509,7 +509,9 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
 
   /// Carga las preguntas existentes del examen que se está editando
   Future<void> _cargarPreguntasExistentes() async {
-    if (widget.examen == null) return;
+    if (widget.examen == null) {
+      return;
+    }
     
     setState(() {
       _cargandoPreguntas = true;
@@ -517,7 +519,7 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
     
     try {
       final repo = ExamenRepository();
-      final preguntasExistentes = await repo.obtenerPreguntasExamen(widget.examen!.id);
+      final preguntasExistentes = await repo.obtenerPreguntasExamen(widget.examen!.id!);
       
       setState(() {
         _preguntas.clear();
@@ -541,7 +543,9 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
   void _siguientePaso() {
     if (_pasoActual == 0) {
       // Validar información básica
-      if (!_formKey.currentState!.validate()) return;
+      if (!_formKey.currentState!.validate()) {
+        return;
+      }
       if (_fechaInicio == null || _fechaFin == null) {
         _mostrarError('Por favor selecciona las fechas del examen');
         return;
@@ -607,7 +611,7 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
         
         // Actualizar datos del examen
         final examenActualizado = ModeloExamen(
-          id: widget.examen!.id,
+          id: widget.examen!.id!,
           titulo: _tituloController.text,
           descripcion: _descripcionController.text,
           instrucciones: _instruccionesController.text,
@@ -648,7 +652,6 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
         
         // Crear el examen
         final examen = ModeloExamen(
-          id: 0,
           titulo: _tituloController.text,
           descripcion: _descripcionController.text,
           instrucciones: _instruccionesController.text,
@@ -1234,9 +1237,11 @@ class _EntregasExamenWidgetState extends ConsumerState<_EntregasExamenWidget> {
   }
 
   void _cargarDatos() {
-    _futureEntregas = _entregaRepo.obtenerEntregasConEstudiante(widget.examen.id);
-    _futureEstadisticas = _entregaRepo.obtenerEstadisticasExamen(widget.examen.id);
-    _futurePreguntas = _entregaRepo.obtenerPreguntasExamen(widget.examen.id);
+    if (widget.examen.id != null) {
+      _futureEntregas = _entregaRepo.obtenerEntregasConEstudiante(widget.examen.id!);
+      _futureEstadisticas = _entregaRepo.obtenerEstadisticasExamen(widget.examen.id!);
+      _futurePreguntas = _entregaRepo.obtenerPreguntasExamen(widget.examen.id!);
+    }
   }
 
   @override
@@ -1997,8 +2002,10 @@ class _PuntajesExamenWidgetState extends ConsumerState<_PuntajesExamenWidget> {
   }
 
   void _cargarDatos() {
-    _futureEntregas = _entregaRepo.obtenerEntregasConEstudiante(widget.examen.id);
-    _futureEstadisticas = _entregaRepo.obtenerEstadisticasExamen(widget.examen.id);
+    if (widget.examen.id != null) {
+      _futureEntregas = _entregaRepo.obtenerEntregasConEstudiante(widget.examen.id!);
+      _futureEstadisticas = _entregaRepo.obtenerEstadisticasExamen(widget.examen.id!);
+    }
   }
 
   @override

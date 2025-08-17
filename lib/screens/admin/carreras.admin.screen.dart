@@ -4,6 +4,7 @@ import 'package:aulago/utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final carrerasProvider = StateNotifierProvider<_CarrerasNotifier, List<ModeloCarrera>>((ref) {
   return _CarrerasNotifier();
@@ -317,8 +318,11 @@ class _DialogoCarreraState extends ConsumerState<_DialogoCarrera> {
   final _duracionController = TextEditingController();
   final _directorNombreController = TextEditingController();
   final _directorEmailController = TextEditingController();
-  final _facultadIdController = TextEditingController();
   bool _guardando = false;
+  
+  // Variables para facultades
+  List<Map<String, dynamic>> _facultades = [];
+  int? _facultadSeleccionada;
   @override
   void initState() {
     super.initState();
@@ -329,9 +333,34 @@ class _DialogoCarreraState extends ConsumerState<_DialogoCarrera> {
       _duracionController.text = widget.carrera!.duracionSemestres.toString();
       _directorNombreController.text = widget.carrera!.directorNombre ?? '';
       _directorEmailController.text = widget.carrera!.directorEmail ?? '';
-      _facultadIdController.text = widget.carrera!.facultadId.toString();
+      // Solo asignar facultad si no es 0 (valor por defecto cuando no hay facultad)
+      if (widget.carrera!.facultadId != 0) {
+        _facultadSeleccionada = widget.carrera!.facultadId;
+      }
     } else {
       _duracionController.text = '10';
+    }
+    _cargarFacultades();
+  }
+  
+  /// Carga las facultades desde la base de datos
+  Future<void> _cargarFacultades() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('facultades')
+          .select('id, nombre, codigo')
+          .order('nombre');
+      
+      setState(() {
+        _facultades = List<Map<String, dynamic>>.from(response);
+        // Si no hay facultad seleccionada, seleccionar la primera por defecto
+        if (_facultadSeleccionada == null && _facultades.isNotEmpty) {
+          _facultadSeleccionada = _facultades.first['id'] as int;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error al cargar facultades: $e');
     }
   }
   @override
@@ -341,9 +370,8 @@ class _DialogoCarreraState extends ConsumerState<_DialogoCarrera> {
     _descripcionController.dispose();
     _duracionController.dispose();
     _directorNombreController.dispose();
-    _directorEmailController.dispose();
-    _facultadIdController.dispose();
-    super.dispose();
+          _directorEmailController.dispose();
+      super.dispose();
   }
   @override
   Widget build(BuildContext context) {
@@ -418,11 +446,24 @@ class _DialogoCarreraState extends ConsumerState<_DialogoCarrera> {
                         ],
                       ),
                       const SizedBox(height: AppConstants.defaultPadding),
-                      TextFormField(
-                        controller: _facultadIdController,
-                        decoration: const InputDecoration(labelText: 'Facultad ID *', border: OutlineInputBorder()),
-                        keyboardType: TextInputType.number,
-                        validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
+                      DropdownButtonFormField<int>(
+                        initialValue: _facultades.isNotEmpty ? (_facultadSeleccionada ?? _facultades.first['id'] as int) : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Facultad *',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _facultades.map((facultad) {
+                          return DropdownMenuItem<int>(
+                            value: facultad['id'] as int,
+                            child: Text(facultad['nombre'] as String),
+                          );
+                        }).toList(),
+                        onChanged: (int? value) {
+                          setState(() {
+                            _facultadSeleccionada = value;
+                          });
+                        },
+                        validator: (value) => value == null ? 'Selecciona una facultad' : null,
                       ),
                       const SizedBox(height: AppConstants.defaultPadding),
                       TextFormField(
@@ -491,7 +532,7 @@ class _DialogoCarreraState extends ConsumerState<_DialogoCarrera> {
       nombre: _nombreController.text.trim(),
       codigo: _codigoController.text.trim().toUpperCase(),
       descripcion: _descripcionController.text.trim().isEmpty ? null : _descripcionController.text.trim(),
-      facultadId: int.tryParse(_facultadIdController.text.trim()) ?? 0,
+      facultadId: _facultadSeleccionada ?? 1,
       duracionSemestres: int.tryParse(_duracionController.text.trim()) ?? 10,
       directorNombre: _directorNombreController.text.trim().isEmpty ? null : _directorNombreController.text.trim(),
       directorEmail: _directorEmailController.text.trim().isEmpty ? null : _directorEmailController.text.trim(),

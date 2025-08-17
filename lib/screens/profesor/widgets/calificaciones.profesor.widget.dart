@@ -198,11 +198,11 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     int totalAprobados = 0;
     int totalReprobados = 0;
     double sumaNotas = 0;
-    int totalEstudiantes = estudiantes.length;
+    final int totalEstudiantes = estudiantes.length;
     
     for (final estudiante in estudiantes) {
       double sumaCalificaciones = 0;
-      int totalEvaluaciones = evaluaciones.length;
+      final int totalEvaluaciones = evaluaciones.length;
       
       for (final evaluacion in evaluaciones) {
         final key = '${estudiante.id}-${evaluacion.id}';
@@ -458,7 +458,7 @@ class _CalificacionesTabState extends ConsumerState<CalificacionesTab> {
     Map<String, CalificacionUnificada> mapaCalificaciones
   ) {
     double suma = 0;
-    int totalEvaluaciones = evaluaciones.length;
+    final int totalEvaluaciones = evaluaciones.length;
     
     for (final evaluacion in evaluaciones) {
       final key = '${estudiante.id}-${evaluacion.id}';

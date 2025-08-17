@@ -95,6 +95,7 @@ class EntregaRepository extends BaseRepository<ModeloEntrega> {
   }
 
   /// Obtiene una entrega específica por tarea y estudiante
+  /// Si hay múltiples entregas, retorna la más reciente
   Future<ModeloEntrega?> obtenerEntregaPorTareaYEstudiante(int tareaId, int estudianteId) async {
     try {
       debugPrint('[EntregaRepository] Buscando entrega: tarea=$tareaId, estudiante=$estudianteId');
@@ -104,14 +105,15 @@ class EntregaRepository extends BaseRepository<ModeloEntrega> {
           .select()
           .eq('tarea_id', tareaId)
           .eq('estudiante_id', estudianteId)
-          .maybeSingle();
+          .order('fecha_entrega', ascending: false) // Ordenar por fecha más reciente
+          .limit(1); // Solo obtener la primera (más reciente)
       
-      if (response == null) {
+      if ((response as List).isEmpty) {
         debugPrint('[EntregaRepository] No se encontró entrega para tarea $tareaId y estudiante $estudianteId');
         return null;
       }
       
-      final entrega = fromJson(response);
+      final entrega = fromJson(response.first);
       debugPrint('[EntregaRepository] ✅ Entrega encontrada: ID ${entrega.id}');
       return entrega;
     } catch (e) {

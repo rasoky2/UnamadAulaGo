@@ -63,8 +63,6 @@ class _PantallaCursosAdminState extends ConsumerState<PantallaCursosAdmin> {
   final CarreraRepository _carreraRepo = CarreraRepository();
   final ProfesorRepository _profesorRepo = ProfesorRepository();
 
-  List<ModeloCarrera> _carreras = const [];
-  List<ProfesorAdmin> _profesores = const [];
   Map<int, String> _carreraIdToNombre = {};
   Map<int, String> _profesorIdToNombre = {};
 
@@ -78,10 +76,10 @@ class _PantallaCursosAdminState extends ConsumerState<PantallaCursosAdmin> {
     try {
       final carreras = await _carreraRepo.obtenerCarreras();
       final profesores = await _profesorRepo.obtenerProfesores();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
-        _carreras = carreras;
-        _profesores = profesores;
         _carreraIdToNombre = {
           for (final c in carreras) c.id: c.nombre,
         };
@@ -185,7 +183,7 @@ class _PantallaCursosAdminState extends ConsumerState<PantallaCursosAdmin> {
       itemCount: cursos.length,
       itemBuilder: (context, index) {
         final curso = cursos[index];
-        final carreraNombre = _carreraIdToNombre[curso.carreraId ?? -1] ?? '—';
+        final carreraNombre = _carreraIdToNombre[curso.carreraId] ?? '—';
         final profesorNombre = curso.profesorId != null
             ? (_profesorIdToNombre[curso.profesorId!] ?? '—')
             : '—';
@@ -301,7 +299,9 @@ class _DialogoCursoState extends ConsumerState<_DialogoCurso> {
     try {
       final carreras = await _carreraRepo.obtenerCarreras();
       final profesores = await _profesorRepo.obtenerProfesores();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _carreras = carreras;
         _profesores = profesores;
@@ -357,7 +357,7 @@ class _DialogoCursoState extends ConsumerState<_DialogoCurso> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int>(
-                  value: _carreraSeleccionadaId,
+                  initialValue: _carreraSeleccionadaId,
                   decoration: const InputDecoration(labelText: 'Carrera *', border: OutlineInputBorder()),
                   items: _carreras
                       .map((c) => DropdownMenuItem<int>(
@@ -370,7 +370,7 @@ class _DialogoCursoState extends ConsumerState<_DialogoCurso> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int>(
-                  value: _profesorSeleccionadoId,
+                  initialValue: _profesorSeleccionadoId,
                   decoration: const InputDecoration(labelText: 'Profesor', border: OutlineInputBorder()),
                   items: _profesores
                       .map((p) => DropdownMenuItem<int>(

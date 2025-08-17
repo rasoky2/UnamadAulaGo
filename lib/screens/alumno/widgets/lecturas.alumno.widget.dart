@@ -2,7 +2,6 @@ import 'package:aulago/models/lectura.model.dart';
 import 'package:aulago/repositories/lectura.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LecturasAlumnoWidget extends StatefulWidget {
@@ -76,7 +75,7 @@ class _LecturasAlumnoWidgetState extends State<LecturasAlumnoWidget> {
           padding: const EdgeInsets.all(16.0),
           child: Row(
             children: [
-              Icon(Icons.menu_book, color: AppConstants.primaryColor, size: 24),
+              const Icon(Icons.menu_book, color: AppConstants.primaryColor, size: 24),
               const SizedBox(width: 12),
               const Text(
                 'Lecturas del Curso',
@@ -204,7 +203,7 @@ class _LecturasAlumnoWidgetState extends State<LecturasAlumnoWidget> {
                             color: AppConstants.primaryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.menu_book, 
                             color: AppConstants.primaryColor,
                             size: 24,
