@@ -13,8 +13,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class TareasWidget extends StatefulWidget {
-  const TareasWidget({super.key, this.onRegresar});
+  const TareasWidget({
+    super.key, 
+    this.onRegresar,
+    required this.cursoId,
+  });
   final VoidCallback? onRegresar;
+  final int cursoId;
 
   @override
   State<TareasWidget> createState() => _TareasWidgetState();
@@ -22,7 +27,9 @@ class TareasWidget extends StatefulWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(ObjectFlagProperty<VoidCallback?>.has('onRegresar', onRegresar));
+    properties
+      ..add(ObjectFlagProperty<VoidCallback?>.has('onRegresar', onRegresar))
+      ..add(IntProperty('cursoId', cursoId));
   }
 }
 
@@ -83,7 +90,7 @@ class _TareasWidgetState extends State<TareasWidget> {
             key: _refreshKey,
             onRefresh: _refrescarTareas,
             child: FutureBuilder<List<ModeloTarea>>(
-              future: repo.obtenerTareas(),
+              future: repo.obtenerTareasPorCurso(widget.cursoId),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -93,7 +100,36 @@ class _TareasWidgetState extends State<TareasWidget> {
                 }
                 final tareas = snapshot.data ?? [];
                 if (tareas.isEmpty) {
-                  return const Center(child: Text('Datos no encontrados'));
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.assignment_outlined,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No hay tareas para este curso',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Las tareas aparecerán aquí cuando el profesor las asigne',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
                 }
                 return _construirTablaTareas(tareas);
               },

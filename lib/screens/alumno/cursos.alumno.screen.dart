@@ -10,6 +10,7 @@ import 'package:aulago/screens/alumno/widgets/tareas.widget.dart';
 import 'package:aulago/screens/alumno/widgets/unidades.widget.dart';
 import 'package:aulago/screens/alumno/widgets/wiki.widget.dart';
 import 'package:aulago/utils/constants.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:moony_nav_bar/moony_nav_bar.dart';
@@ -26,6 +27,12 @@ class PantallaCursosAlumno extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<PantallaCursosAlumno> createState() => _PantallaCursosAlumnoState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(IntProperty('initialCursoId', initialCursoId));
+  }
 }
 
 class _PantallaCursosAlumnoState extends ConsumerState<PantallaCursosAlumno> {
@@ -356,7 +363,7 @@ class _PantallaCursosAlumnoState extends ConsumerState<PantallaCursosAlumno> {
         cursoId: (cursoId ?? 0).toString(),
         onRegresar: () {},
       ),
-      const TareasWidget(),
+      TareasWidget(cursoId: cursoId ?? 0),
       ExamenesWidget(
         cursoId: (cursoId ?? 0).toString(),
       ),
@@ -775,7 +782,7 @@ class _PantallaCursosAlumnoState extends ConsumerState<PantallaCursosAlumno> {
           onRegresar: () {},
         );
       case 'tareas':
-        return const TareasWidget();
+        return TareasWidget(cursoId: cursoId ?? 0);
       case 'examenes':
         return ExamenesWidget(
           cursoId: (cursoId ?? 0).toString(),

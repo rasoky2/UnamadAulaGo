@@ -225,6 +225,7 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
   final _estRepo = EstudianteRepository();
   final TextEditingController _nuevaContrasenaController = TextEditingController();
   final TextEditingController _contrasenaAlCrearController = TextEditingController();
+  bool _mostrarContrasena = false;
   @override
   void initState() {
     super.initState();
@@ -398,15 +399,57 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => _mostrarDialogoContrasena(context),
-                  icon: const Icon(Icons.lock_reset),
-                  label: const Text('Cambiar contraseña'),
+              const SizedBox(height: 16),
+              // Campo de contraseña para edición
+              if (esEdicion) ...[
+                TextFormField(
+                  controller: _nuevaContrasenaController,
+                  decoration: InputDecoration(
+                    labelText: 'Nueva contraseña (opcional)',
+                    border: const OutlineInputBorder(),
+                    helperText: _nuevaContrasenaController.text.isEmpty 
+                        ? 'Dejar vacío para mantener la contraseña actual'
+                        : _nuevaContrasenaController.text.length >= 6 
+                            ? 'Contraseña válida' 
+                            : 'Mínimo 6 caracteres',
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_nuevaContrasenaController.text.isNotEmpty)
+                          Icon(
+                            _nuevaContrasenaController.text.length >= 6 
+                                ? Icons.check_circle 
+                                : Icons.error,
+                            color: _nuevaContrasenaController.text.length >= 6 
+                                ? Colors.green 
+                                : Colors.orange,
+                          ),
+                        IconButton(
+                          icon: Icon(_mostrarContrasena ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () {
+                            setState(() {
+                              _mostrarContrasena = !_mostrarContrasena;
+                            });
+                          },
+                          tooltip: _mostrarContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña',
+                        ),
+                      ],
+                    ),
+                  ),
+                  obscureText: !_mostrarContrasena,
+                  onChanged: (value) {
+                    setState(() {}); // Reconstruir para mostrar el indicador visual
+                  },
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty && value.trim().length < 6) {
+                      return 'La contraseña debe tener al menos 6 caracteres';
+                    }
+                    return null;
+                  },
                 ),
-              ),
+                const SizedBox(height: 16),
+              ],
             ],
           ),
         ),
@@ -464,6 +507,22 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
         } catch (_) {}
       }
     }
+    
+    // Si es edición y se proporcionó una nueva contraseña, actualizarla
+    if (!creando && _nuevaContrasenaController.text.trim().isNotEmpty) {
+      try {
+        await _estRepo.actualizarContrasena(
+          estudianteId: estudiante.id,
+          nuevaContrasena: _nuevaContrasenaController.text.trim(),
+          usuarioId: widget.estudiante?.usuarioId,
+        );
+      } catch (_) {}
+    }
+    if (success) {
+      // Limpiar el campo de contraseña después de guardar exitosamente
+      _nuevaContrasenaController.clear();
+    }
+    
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -473,68 +532,5 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
     );
   }
 
-  void _mostrarDialogoContrasena(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('Cambiar contraseña'),
-        content: SizedBox(
-          width: 360,
-          child: TextFormField(
-            controller: _nuevaContrasenaController,
-            decoration: const InputDecoration(
-              labelText: 'Nueva contraseña',
-              border: OutlineInputBorder(),
-              helperText: 'Se guardará en estudiantes y usuarios',
-            ),
-            obscureText: true,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialog).pop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final nueva = _nuevaContrasenaController.text;
-              if (nueva.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ingrese una contraseña válida'), backgroundColor: Colors.red),
-                );
-                return;
-              }
-              final estudianteId = widget.estudiante?.id;
-              if (estudianteId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Primero guarde el estudiante'), backgroundColor: Colors.orange),
-                );
-                return;
-              }
-              try {
-                await _estRepo.actualizarContrasena(
-                  estudianteId: estudianteId,
-                  nuevaContrasena: nueva,
-                  usuarioId: widget.estudiante?.usuarioId,
-                );
-                if (mounted) {
-                  Navigator.of(dialog).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Contraseña actualizada'), backgroundColor: Colors.green),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    );
-  }
+
 }

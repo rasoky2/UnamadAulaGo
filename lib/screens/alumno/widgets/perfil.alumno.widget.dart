@@ -5,14 +5,53 @@ import 'package:aulago/utils/constants.dart';
 import 'package:aulago/widgets/foto_perfil_upload.widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class PerfilAlumnoWidget extends ConsumerWidget {
+class PerfilAlumnoWidget extends ConsumerStatefulWidget {
   const PerfilAlumnoWidget({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PerfilAlumnoWidget> createState() => _PerfilAlumnoWidgetState();
+}
+
+class _PerfilAlumnoWidgetState extends ConsumerState<PerfilAlumnoWidget> {
+  EstudianteAdmin? _estudiante;
+  bool _cargando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatosEstudiante();
+  }
+
+  Future<void> _cargarDatosEstudiante() async {
+    try {
+      final usuario = ref.read(proveedorAuthProvider).usuario;
+      if (usuario != null) {
+        final repository = EstudianteRepository();
+        final estudiante = await repository.obtenerEstudiantePorUsuarioId(usuario.id);
+        
+        if (mounted) {
+          setState(() {
+            _estudiante = estudiante;
+            _cargando = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error al cargar datos del estudiante: $e');
+      if (mounted) {
+        setState(() {
+          _cargando = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final usuario = ref.watch(proveedorAuthProvider).usuario;
     if (usuario == null) {
       return const Center(
@@ -39,6 +78,25 @@ class PerfilAlumnoWidget extends ConsumerWidget {
     
     final ancho = MediaQuery.of(context).size.width;
     final esMovil = ancho < 700;
+    
+    if (_cargando) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Cargando perfil del estudiante...',
+              style: TextStyle(
+                fontSize: 16,
+                color: AppConstants.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     
     return SingleChildScrollView(
       padding: EdgeInsets.all(esMovil ? 16 : 24),
@@ -74,6 +132,10 @@ class PerfilAlumnoWidget extends ConsumerWidget {
           _construirHeaderPerfil(usuario, esMovil),
           const SizedBox(height: 24),
           
+          // Botón de refresh
+          _construirBotonRefresh(esMovil),
+          const SizedBox(height: 16),
+          
           // Información del usuario
           _construirInformacionUsuario(usuario, esMovil),
           
@@ -105,6 +167,13 @@ class PerfilAlumnoWidget extends ConsumerWidget {
               if (estudianteCompleto != null) {
                 final estudianteActualizado = estudianteCompleto.copyWith(fotoPerfilUrl: nuevaUrl);
                 await repository.actualizarEstudiante(estudianteCompleto.id, estudianteActualizado);
+                
+                // Actualizar el estado local
+                if (mounted) {
+                  setState(() {
+                    _estudiante = estudianteActualizado;
+                  });
+                }
               }
             } catch (e) {
               debugPrint('Error al actualizar foto de perfil: $e');
@@ -168,36 +237,53 @@ class PerfilAlumnoWidget extends ConsumerWidget {
           esMovil: esMovil,
           valueColor: usuario.activo ? Colors.green : Colors.red,
         ),
-        if (usuario.perfil != null && usuario.perfil is Map<String, dynamic>) ...[
+        // Información del estudiante desde el repositorio
+        if (_estudiante != null) ...[
           const SizedBox(height: 16),
           _construirInfoItem(
             icon: LucideIcons.graduationCap,
             label: 'Carrera',
-            value: usuario.perfil['carrera'] ?? 'No disponible',
+            value: _estudiante!.carreraId.toString(),
             esMovil: esMovil,
           ),
           const SizedBox(height: 16),
           _construirInfoItem(
             icon: LucideIcons.bookOpen,
-            label: 'Semestre',
-            value: usuario.perfil['semestre']?.toString() ?? 'No disponible',
+            label: 'Semestre actual',
+            value: _estudiante!.semestreActual.toString(),
+            esMovil: esMovil,
+          ),
+          const SizedBox(height: 16),
+          _construirInfoItem(
+            icon: LucideIcons.phone,
+            label: 'Teléfono',
+            value: _estudiante!.telefono ?? 'No disponible',
+            esMovil: esMovil,
+          ),
+          const SizedBox(height: 16),
+          _construirInfoItem(
+            icon: LucideIcons.mapPin,
+            label: 'Dirección',
+            value: _estudiante!.direccion ?? 'No disponible',
+            esMovil: esMovil,
+          ),
+          if (_estudiante!.fechaNacimiento != null) ...[
+            const SizedBox(height: 16),
+            _construirInfoItem(
+              icon: LucideIcons.calendar,
+              label: 'Fecha de nacimiento',
+              value: _estudiante!.fechaNacimiento!.toString().substring(0, 10),
+              esMovil: esMovil,
+            ),
+          ],
+          const SizedBox(height: 16),
+          _construirInfoItem(
+            icon: LucideIcons.calendarDays,
+            label: 'Fecha de ingreso',
+            value: _estudiante!.fechaIngreso.toString().substring(0, 10),
             esMovil: esMovil,
           ),
         ],
-        const SizedBox(height: 16),
-        _construirInfoItem(
-          icon: LucideIcons.phone,
-          label: 'Teléfono',
-          value: usuario.perfil?.telefono ?? 'No disponible',
-          esMovil: esMovil,
-        ),
-        const SizedBox(height: 16),
-        _construirInfoItem(
-          icon: LucideIcons.mapPin,
-          label: 'Dirección',
-          value: usuario.perfil?.direccion ?? 'No disponible',
-          esMovil: esMovil,
-        ),
       ],
     );
   }
@@ -278,6 +364,38 @@ class PerfilAlumnoWidget extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _construirBotonRefresh(bool esMovil) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              setState(() => _cargando = true);
+              await _cargarDatosEstudiante();
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('Actualizar datos'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppConstants.primaryColor,
+              side: BorderSide(color: AppConstants.primaryColor),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: EdgeInsets.symmetric(
+                horizontal: esMovil ? 16 : 24,
+                vertical: esMovil ? 12 : 16,
+              ),
+              textStyle: TextStyle(
+                fontSize: esMovil ? 14 : 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -474,10 +592,18 @@ class _DialogoEditarPerfilWidgetState extends ConsumerState<_DialogoEditarPerfil
                   decoration: const InputDecoration(
                     labelText: 'Nombres *',
                     border: OutlineInputBorder(),
+                    hintText: 'Solo letras',
                   ),
+                  textCapitalization: TextCapitalization.words,
                   validator: (value) {
                     if (value?.isEmpty == true) {
                       return 'Campo requerido';
+                    }
+                    if (!RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$').hasMatch(value!)) {
+                      return 'Solo se permiten letras';
+                    }
+                    if (value.trim().length < 2) {
+                      return 'Mínimo 2 caracteres';
                     }
                     return null;
                   },
@@ -488,10 +614,18 @@ class _DialogoEditarPerfilWidgetState extends ConsumerState<_DialogoEditarPerfil
                   decoration: const InputDecoration(
                     labelText: 'Apellidos *',
                     border: OutlineInputBorder(),
+                    hintText: 'Solo letras',
                   ),
+                  textCapitalization: TextCapitalization.words,
                   validator: (value) {
                     if (value?.isEmpty == true) {
                       return 'Campo requerido';
+                    }
+                    if (!RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$').hasMatch(value!)) {
+                      return 'Solo se permiten letras';
+                    }
+                    if (value.trim().length < 2) {
+                      return 'Mínimo 2 caracteres';
                     }
                     return null;
                   },
@@ -502,14 +636,18 @@ class _DialogoEditarPerfilWidgetState extends ConsumerState<_DialogoEditarPerfil
                   decoration: const InputDecoration(
                     labelText: 'Email *',
                     border: OutlineInputBorder(),
+                    hintText: 'usuario@unamad.edu.pe',
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
                     if (value?.isEmpty == true) {
                       return 'Campo requerido';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
-                      return 'Email inválido';
+                    if (!value!.endsWith('@unamad.edu.pe')) {
+                      return 'El email debe terminar en @unamad.edu.pe';
+                    }
+                    if (!RegExp(r'^[a-zA-Z0-9._%+-]+@unamad\.edu\.pe$').hasMatch(value)) {
+                      return 'Formato de email inválido';
                     }
                     return null;
                   },
@@ -520,8 +658,24 @@ class _DialogoEditarPerfilWidgetState extends ConsumerState<_DialogoEditarPerfil
                   decoration: const InputDecoration(
                     labelText: 'Teléfono',
                     border: OutlineInputBorder(),
+                    hintText: 'Máximo 9 dígitos',
                   ),
                   keyboardType: TextInputType.phone,
+                  maxLength: 9,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      if (value.length != 9) {
+                        return 'El teléfono debe tener 9 dígitos';
+                      }
+                      if (!RegExp(r'^[0-9]{9}$').hasMatch(value)) {
+                        return 'Solo se permiten números';
+                      }
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

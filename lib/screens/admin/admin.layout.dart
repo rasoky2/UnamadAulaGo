@@ -5,6 +5,7 @@ import 'package:aulago/screens/admin/alumno.admin.screen.dart';
 import 'package:aulago/screens/admin/carreras.admin.screen.dart';
 import 'package:aulago/screens/admin/cursos.admin.screen.dart';
 import 'package:aulago/screens/admin/extras.admin.screen.dart';
+import 'package:aulago/screens/admin/home.admin.screen.dart';
 import 'package:aulago/screens/admin/matricula.admin.screen.dart';
 import 'package:aulago/screens/admin/profesores.admin.screen.dart';
 import 'package:aulago/utils/constants.dart';
@@ -255,9 +256,6 @@ class _AdminLayoutState extends ConsumerState<AdminLayout> {
           
           // Estadísticas rápidas en drawer
           const SizedBox(height: 16),
-          _EstadisticasRapidasMovil(),
-          
-          const SizedBox(height: 16),
           
           // Menú de navegación
           Expanded(
@@ -391,82 +389,7 @@ class _AdminLayoutState extends ConsumerState<AdminLayout> {
   // Constructores de páginas lazy
   Widget _construirPaginaInicio() {
     debugPrint('🏠 AdminLayout: Construyendo página de inicio');
-    return Consumer(
-      builder: (context, ref, child) {
-        final estadisticas = ref.watch(estadisticasAdminProvider);
-        
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Estadísticas principales
-              _EstadisticasRapidas(estadisticas: estadisticas),
-              
-              const SizedBox(height: 32),
-              
-              // Resumen de actividad
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Bienvenido al Panel Administrativo',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppConstants.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Desde aquí puedes gestionar estudiantes, profesores, cursos y matrículas. Utiliza la navegación lateral o el menú inferior para acceder a las diferentes secciones.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppConstants.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          _AccesoRapido(
-                            titulo: 'Estudiantes',
-                            icono: Icons.people,
-                            color: Colors.blue,
-                            onTap: () => ref.read(indiceNavegacionAdminProvider.notifier).state = 1,
-                          ),
-                          _AccesoRapido(
-                            titulo: 'Matrículas',
-                            icono: Icons.school,
-                            color: Colors.green,
-                            onTap: () => ref.read(indiceNavegacionAdminProvider.notifier).state = 2,
-                          ),
-                          _AccesoRapido(
-                            titulo: 'Profesores',
-                            icono: Icons.person_add,
-                            color: Colors.orange,
-                            onTap: () => ref.read(indiceNavegacionAdminProvider.notifier).state = 3,
-                          ),
-                          _AccesoRapido(
-                            titulo: 'Cursos',
-                            icono: Icons.book,
-                            color: Colors.purple,
-                            onTap: () => ref.read(indiceNavegacionAdminProvider.notifier).state = 4,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    return const PantallaHomeAdmin();
   }
 
   Widget _construirPaginaEstudiantes() {
@@ -721,60 +644,7 @@ class _EstadisticasRapidas extends StatelessWidget {
   }
 }
 
-class _EstadisticasRapidasMovil extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final estadisticas = ref.watch(estadisticasAdminProvider);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppConstants.primaryColor.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'Estadísticas',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppConstants.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (estadisticas.cargando)
-            const CircularProgressIndicator(strokeWidth: 2)
-          else
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _EstadisticaMiniMovil(
-                  icono: Icons.school,
-                  valor: estadisticas.totalEstudiantes,
-                  etiqueta: 'Estudiantes',
-                  color: Colors.blue,
-                ),
-                _EstadisticaMiniMovil(
-                  icono: Icons.person_outline,
-                  valor: estadisticas.totalProfesores,
-                  etiqueta: 'Profesores',
-                  color: Colors.green,
-                ),
-                _EstadisticaMiniMovil(
-                  icono: Icons.book,
-                  valor: estadisticas.totalCursos,
-                  etiqueta: 'Cursos',
-                  color: Colors.orange,
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 class _EstadisticaMini extends StatelessWidget {
 
@@ -822,61 +692,7 @@ class _EstadisticaMini extends StatelessWidget {
   }
 }
 
-class _EstadisticaMiniMovil extends StatelessWidget {
 
-  const _EstadisticaMiniMovil({
-    required this.icono,
-    required this.valor,
-    required this.etiqueta,
-    required this.color,
-  });
-  final IconData icono;
-  final int valor;
-  final String etiqueta;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icono, color: color, size: 20),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          valor.toString(),
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          etiqueta,
-          style: const TextStyle(
-            fontSize: 10,
-            color: AppConstants.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties
-      ..add(DiagnosticsProperty<IconData>('icono', icono))
-      ..add(IntProperty('valor', valor))
-      ..add(StringProperty('etiqueta', etiqueta))
-    ..add(ColorProperty('color', color));
-  }
-}
 
 class _MenuNavegacion extends StatelessWidget {
 
@@ -1343,66 +1159,4 @@ class _InfoUsuarioMovil extends StatelessWidget {
   }
 }
 
-class _AccesoRapido extends StatelessWidget {
-
-  const _AccesoRapido({
-    required this.titulo,
-    required this.icono,
-    required this.color,
-    required this.onTap,
-  });
-  final String titulo;
-  final IconData icono;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () {
-          debugPrint('🚀 AccesoRapido: Navegando a $titulo');
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icono, color: color, size: 24),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                titulo,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties
-      ..add(StringProperty('titulo', titulo))
-      ..add(DiagnosticsProperty<IconData>('icono', icono))
-      ..add(ColorProperty('color', color))
-      ..add(ObjectFlagProperty<VoidCallback>.has('onTap', onTap));
-  }
-} 
+ 
