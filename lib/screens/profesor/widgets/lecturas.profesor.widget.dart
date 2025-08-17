@@ -14,6 +14,12 @@ class LecturasTab extends StatefulWidget {
 
   @override
   State<LecturasTab> createState() => _LecturasTabState();
+  
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(StringProperty('cursoId', cursoId));
+  }
 }
 
 class _LecturasTabState extends State<LecturasTab> {
@@ -294,7 +300,9 @@ class _LecturasTabState extends State<LecturasTab> {
             ),
             ElevatedButton(
               onPressed: isSubiendo ? null : () async {
-                if (!formKey.currentState!.validate()) return;
+                if (!formKey.currentState!.validate()) {
+                  return;
+                }
                 
                 // Validar que se haya seleccionado un archivo si es PDF
                 if (!esEnlace && archivo == null && bytes == null) {
@@ -339,7 +347,6 @@ class _LecturasTabState extends State<LecturasTab> {
 
                   // Crear la lectura con el cursoId
                   await _repo.crearLectura(Lectura(
-                    id: 0,
                     titulo: tituloCtrl.text.trim(),
                     descripcion: descripcionCtrl.text.trim().isEmpty ? null : descripcionCtrl.text.trim(),
                     enlacePdf: url,
@@ -576,7 +583,9 @@ class _LecturasTabState extends State<LecturasTab> {
                               tooltip: 'Abrir enlace',
                               onPressed: () async {
                                 final uri = Uri.tryParse(l.enlacePdf);
-                                if (uri == null) return;
+                                if (uri == null) {
+                                  return;
+                                }
                                 if (await canLaunchUrl(uri)) {
                                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                                 } else {
@@ -619,7 +628,7 @@ class _LecturasTabState extends State<LecturasTab> {
                                 
                                 if (confirmar == true) {
                                   try {
-                                    await _repo.eliminarLectura(l.id);
+                                    await _repo.eliminarLectura(l.id!);
                                     await _refrescar();
                                     if (mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(

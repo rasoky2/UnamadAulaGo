@@ -55,6 +55,27 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
   bool _subiendo = false;
   String? _fotoUrlTemporal;
 
+  // Métodos auxiliares para obtener texto según la plataforma
+  String _obtenerTituloArchivo() {
+    if (kIsWeb) {
+      return 'Seleccionar archivo';
+    } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      return 'Elegir desde archivos';
+    } else {
+      return 'Elegir desde archivos';
+    }
+  }
+
+  String _obtenerSubtituloArchivo() {
+    if (kIsWeb) {
+      return 'Subir imagen desde tu computadora';
+    } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      return 'Explorar archivos del sistema';
+    } else {
+      return 'Explorar archivos del dispositivo';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final fotoUrl = _fotoUrlTemporal ?? widget.fotoActualUrl;
@@ -135,7 +156,8 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
                 const SizedBox(height: 20),
                 
                 // Opciones
-                if (!kIsWeb) ...[
+                // Solo mostrar cámara y galería en dispositivos móviles (Android/iOS)
+                if (Platform.isAndroid || Platform.isIOS) ...[
                   ListTile(
                     leading: Container(
                       padding: const EdgeInsets.all(8),
@@ -179,10 +201,8 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
                     ),
                     child: const Icon(Icons.folder_open, color: Colors.orange),
                   ),
-                  title: const Text(kIsWeb ? 'Seleccionar archivo' : 'Elegir desde archivos'),
-                  subtitle: const Text(kIsWeb 
-                      ? 'Subir imagen desde tu computadora'
-                      : 'Explorar archivos del dispositivo'),
+                  title: Text(_obtenerTituloArchivo()),
+                  subtitle: Text(_obtenerSubtituloArchivo()),
                   onTap: () {
                     Navigator.pop(context);
                     _seleccionarDesdeArchivos();
@@ -235,6 +255,20 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
   }
 
   Future<void> _seleccionarFoto(ImageSource source) async {
+    // Solo permitir en dispositivos móviles
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Esta opción solo está disponible en dispositivos móviles'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       final XFile? imagen = await _picker.pickImage(
         source: source,
@@ -253,25 +287,13 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
 
       String nuevaUrl;
       
-      if (kIsWeb) {
-        // Para web, usar bytes
-        final bytes = await imagen.readAsBytes();
-        final extension = imagen.path.split('.').last;
-        nuevaUrl = await _storageRepo.subirFotoPerfilDesdeBytes(
-          usuarioId: widget.usuarioId,
-          bytes: bytes,
-          extension: extension,
-          tipoUsuario: widget.tipoUsuario,
-        );
-      } else {
-        // Para móvil, usar archivo
-        final archivo = File(imagen.path);
-        nuevaUrl = await _storageRepo.subirFotoPerfil(
-          usuarioId: widget.usuarioId,
-          archivo: archivo,
-          tipoUsuario: widget.tipoUsuario,
-        );
-      }
+      // Para móvil, usar archivo
+      final archivo = File(imagen.path);
+      nuevaUrl = await _storageRepo.subirFotoPerfil(
+        usuarioId: widget.usuarioId,
+        archivo: archivo,
+        tipoUsuario: widget.tipoUsuario,
+      );
 
       setState(() {
         _fotoUrlTemporal = nuevaUrl;
@@ -315,9 +337,10 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
       });
 
       // Usar file_picker para seleccionar archivo de imagen
+      // En Windows/Web usar withData: true, en móvil usar path
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.image,
-        withData: kIsWeb, // En web necesitamos los bytes
+        withData: kIsWeb || Platform.isWindows || Platform.isMacOS || Platform.isLinux,
       );
 
       if (result != null && result.files.isNotEmpty) {
@@ -337,8 +360,8 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
 
         String nuevaUrl;
 
-        if (kIsWeb) {
-          // En web, usar bytes directamente
+        if (kIsWeb || Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+          // En web/desktop, usar bytes directamente
           if (file.bytes == null) {
             throw Exception('No se pudieron leer los datos del archivo.');
           }
@@ -350,7 +373,7 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
             tipoUsuario: widget.tipoUsuario,
           );
         } else {
-          // En móvil/desktop, usar el path del archivo
+          // En móvil, usar el path del archivo
           if (file.path == null) {
             throw Exception('No se pudo acceder al archivo seleccionado.');
           }

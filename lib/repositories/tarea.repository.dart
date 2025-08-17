@@ -1,5 +1,6 @@
 import 'package:aulago/models/tarea.model.dart';
 import 'package:aulago/repositories/base.repository.dart';
+import 'package:flutter/foundation.dart';
 
 class TareaRepository extends BaseRepository<ModeloTarea> {
   @override
@@ -27,6 +28,21 @@ class TareaRepository extends BaseRepository<ModeloTarea> {
   Future<List<ModeloTarea>> obtenerTareas() async {
     final result = await obtener();
     return result.items;
+  }
+
+  Future<List<ModeloTarea>> obtenerTareasPorCurso(int cursoId) async {
+    try {
+      final response = await supabase
+          .from(tableName)
+          .select()
+          .eq('curso_id', cursoId)
+          .order('fecha_entrega', ascending: true);
+      
+      return (response as List).map((json) => fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('Error al obtener tareas por curso: $e');
+      rethrow;
+    }
   }
 
   Future<ModeloTarea?> obtenerTareaPorId(int id) async {

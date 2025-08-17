@@ -16,7 +16,7 @@ class LecturaRepository extends BaseRepository<Lectura> {
   Map<String, dynamic> toJson(Lectura entity) => entity.toJson();
 
   @override
-  String getId(Lectura entity) => entity.id.toString();
+  String getId(Lectura entity) => entity.id?.toString() ?? '0';
 
   Future<List<Lectura>> obtenerLecturas() async {
     final result = await obtener(limite: 1000, offset: 0);
