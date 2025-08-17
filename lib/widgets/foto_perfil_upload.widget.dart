@@ -55,6 +55,27 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
   bool _subiendo = false;
   String? _fotoUrlTemporal;
 
+  @override
+  void initState() {
+    super.initState();
+    _validarDatosIniciales();
+  }
+
+  void _validarDatosIniciales() {
+    // Validar que los datos requeridos estén presentes
+    if (widget.nombreCompleto.isEmpty) {
+      debugPrint('[FotoPerfilUploadWidget] ⚠️ nombreCompleto está vacío');
+    }
+    if (widget.tipoUsuario.isEmpty) {
+      debugPrint('[FotoPerfilUploadWidget] ⚠️ tipoUsuario está vacío');
+    }
+    if (widget.usuarioId.isEmpty) {
+      debugPrint('[FotoPerfilUploadWidget] ⚠️ usuarioId está vacío');
+    }
+    
+    debugPrint('[FotoPerfilUploadWidget] ✅ Datos iniciales validados');
+  }
+
   // Métodos auxiliares para obtener texto según la plataforma
   String _obtenerTituloArchivo() {
     if (kIsWeb) {
@@ -79,15 +100,48 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
   @override
   Widget build(BuildContext context) {
     final fotoUrl = _fotoUrlTemporal ?? widget.fotoActualUrl;
+    
+    // Validaciones para prevenir widget blanco
+    final nombreCompleto = widget.nombreCompleto.isNotEmpty 
+        ? widget.nombreCompleto 
+        : 'Usuario';
+    
+    final tipoUsuario = widget.tipoUsuario.isNotEmpty 
+        ? widget.tipoUsuario 
+        : 'usuario';
+
+    // Debug logging para identificar problemas
+    debugPrint('[FotoPerfilUploadWidget] Renderizando con:');
+    debugPrint('  - nombreCompleto: "$nombreCompleto"');
+    debugPrint('  - tipoUsuario: "$tipoUsuario"');
+    debugPrint('  - fotoUrl: "$fotoUrl"');
+    debugPrint('  - radio: ${widget.radio}');
 
     return Stack(
       children: [
+        // Avatar con fallbacks robustos
         AvatarWidget(
           fotoUrl: fotoUrl,
-          nombreCompleto: widget.nombreCompleto,
-          tipoUsuario: widget.tipoUsuario,
+          nombreCompleto: nombreCompleto,
+          tipoUsuario: tipoUsuario,
           radio: widget.radio,
         ),
+        
+        // Fallback visual en caso de error (nunca debería mostrarse)
+        if (nombreCompleto.isEmpty || tipoUsuario.isEmpty)
+          Container(
+            width: widget.radio * 2,
+            height: widget.radio * 2,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.person,
+              size: widget.radio,
+              color: Colors.grey[600],
+            ),
+          ),
         
         // Botón de editar superpuesto
         Positioned(
@@ -124,6 +178,15 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
   }
 
   void _mostrarOpcionesFoto() {
+    // Validar que estemos en una plataforma válida
+    if (kIsWeb) {
+      debugPrint('[FotoPerfilUploadWidget] Mostrando opciones en Web');
+    } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      debugPrint('[FotoPerfilUploadWidget] Mostrando opciones en Desktop');
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      debugPrint('[FotoPerfilUploadWidget] Mostrando opciones en Móvil');
+    }
+
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -157,7 +220,7 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
                 
                 // Opciones
                 // Solo mostrar cámara y galería en dispositivos móviles (Android/iOS)
-                if (Platform.isAndroid || Platform.isIOS) ...[
+                if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ...[
                   ListTile(
                     leading: Container(
                       padding: const EdgeInsets.all(8),
@@ -256,7 +319,7 @@ class _FotoPerfilUploadWidgetState extends State<FotoPerfilUploadWidget> {
 
   Future<void> _seleccionarFoto(ImageSource source) async {
     // Solo permitir en dispositivos móviles
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
