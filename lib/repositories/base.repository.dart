@@ -188,12 +188,17 @@ abstract class BaseRepository<T> {
     debugPrint('[$repositoryName] Datos a actualizar: $datos');
     
     try {
+      // Solo agregar fecha_actualizacion si la tabla lo soporta
+      final datosActualizados = {...datos};
+      
+      // Verificar si la tabla tiene el campo fecha_actualizacion
+      if (tableName != 'carreras') {
+        datosActualizados['fecha_actualizacion'] = DateTime.now().toIso8601String();
+      }
+      
       final result = await supabase
           .from(tableName)
-          .update({
-            ...datos,
-            'fecha_actualizacion': DateTime.now().toIso8601String(),
-          })
+          .update(datosActualizados)
           .eq('id', id)
           .select()
           .single();
@@ -202,7 +207,7 @@ abstract class BaseRepository<T> {
         table: tableName,
         statusCode: 200,
         response: result,
-        requestBody: datos,
+        requestBody: datosActualizados,
       );
       
       debugPrint('[$repositoryName] Entidad actualizada exitosamente');

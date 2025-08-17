@@ -1,12 +1,12 @@
 import 'package:aulago/providers/auth.riverpod.dart';
 import 'package:aulago/screens/admin/admin.layout.dart';
+import 'package:aulago/screens/admin/extras.admin.screen.dart';
 import 'package:aulago/screens/alumno/alumno.layout.dart';
 import 'package:aulago/screens/alumno/cursos.alumno.screen.dart';
 import 'package:aulago/screens/alumno/home.alumno.screen.dart';
 import 'package:aulago/screens/alumno/widgets/perfil.alumno.widget.dart';
 import 'package:aulago/screens/auth/login.screen.dart';
 import 'package:aulago/screens/profesor/profesor.layout.dart';
-import 'package:aulago/screens/admin/extras.admin.screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

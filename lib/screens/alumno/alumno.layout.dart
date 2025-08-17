@@ -1,8 +1,8 @@
 // Eliminados providers antiguos de alumno; ahora usamos repos y estado local
+import 'package:aulago/models/curso.model.dart';
 import 'package:aulago/providers/auth.riverpod.dart';
 import 'package:aulago/repositories/curso.repository.dart';
 import 'package:aulago/repositories/matricula.repository.dart';
-import 'package:aulago/models/curso.model.dart';
 import 'package:aulago/screens/alumno/cursos.alumno.screen.dart';
 import 'package:aulago/screens/alumno/home.alumno.screen.dart';
 import 'package:aulago/screens/alumno/widgets/perfil.alumno.widget.dart';

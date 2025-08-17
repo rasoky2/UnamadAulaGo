@@ -1,12 +1,11 @@
-import 'package:aulago/models/matricula.model.dart';
 import 'package:aulago/models/carrera.model.dart';
 import 'package:aulago/models/curso.model.dart';
 import 'package:aulago/models/estudiante.model.dart';
-import 'package:aulago/models/usuario.model.dart';
-import 'package:aulago/repositories/matricula.repository.dart';
+import 'package:aulago/models/matricula.model.dart';
 import 'package:aulago/repositories/carrera.repository.dart';
 import 'package:aulago/repositories/curso.repository.dart';
 import 'package:aulago/repositories/estudiante.repository.dart';
+import 'package:aulago/repositories/matricula.repository.dart';
 import 'package:aulago/repositories/periodo_academico.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:aulago/widgets/avatar_widget.dart';
@@ -330,7 +329,9 @@ class _DialogoMatriculaState extends ConsumerState<_DialogoMatricula> {
   Future<void> _cargarInicial() async {
     final carreras = await _carreraRepo.obtenerCarreras();
     final periodos = await _periodoRepo.obtenerPeriodosAcademicos();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _carreras = carreras;
       _periodos = periodos;
@@ -355,7 +356,9 @@ class _DialogoMatriculaState extends ConsumerState<_DialogoMatricula> {
     // Estudiantes por carrera
     final todosEst = await _estudianteRepo.obtenerEstudiantes();
     final estFiltrados = todosEst.where((e) => e.carreraId == carreraId).toList();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _cursosDet = cursosFiltrados;
       _estudiantes = estFiltrados;
@@ -472,7 +475,9 @@ class _DialogoMatriculaState extends ConsumerState<_DialogoMatricula> {
       periodoId: _periodoId ?? 0,
     );
     if (existe) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('El estudiante ya está matriculado en ese curso y periodo'), backgroundColor: Colors.orange),
       );

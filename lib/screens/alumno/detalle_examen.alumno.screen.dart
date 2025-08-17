@@ -44,11 +44,21 @@ class _DetalleExamenAlumnoScreenState extends State<DetalleExamenAlumnoScreen> {
   }
 
   Future<void> _cargarPreguntas() async {
+    // Verificar que el examen tenga un ID válido
+    if (widget.examen.id == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Examen sin ID válido')),
+        );
+      }
+      return;
+    }
+
     try {
       final data = await _supabase
           .from('preguntas_examen')
           .select()
-          .eq('examen_id', widget.examen.id);
+          .eq('examen_id', widget.examen.id!);
       setState(() {
         _preguntas = (data as List).cast<Map<String, dynamic>>();
       });
@@ -111,7 +121,7 @@ class _DetalleExamenAlumnoScreenState extends State<DetalleExamenAlumnoScreen> {
       }
 
       await _supabase.from('examenes_entregas').upsert({
-        'examen_id': widget.examen.id,
+        'examen_id': widget.examen.id!,
         'estudiante_id': estudianteId,
         'fecha_inicio': DateTime.now().toIso8601String(),
         'fecha_fin': DateTime.now().toIso8601String(),
@@ -248,11 +258,40 @@ class _DetalleExamenAlumnoScreenState extends State<DetalleExamenAlumnoScreen> {
             const SizedBox(height: 12),
             Column(
               children: opciones
-                  .map((o) => RadioListTile<String>(
-                        title: Text(o),
-                        value: o,
-                        groupValue: valorSeleccionado as String?,
-                        onChanged: (val) => onChanged(val),
+                  .map((o) => InkWell(
+                        onTap: () => onChanged(o),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: valorSeleccionado == o 
+                                        ? Colors.blue 
+                                        : Colors.grey.shade400,
+                                    width: 2,
+                                  ),
+                                  color: valorSeleccionado == o 
+                                      ? Colors.blue 
+                                      : Colors.transparent,
+                                ),
+                                child: valorSeleccionado == o
+                                    ? const Icon(
+                                        Icons.check,
+                                        size: 14,
+                                        color: Colors.white,
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text(o)),
+                            ],
+                          ),
+                        ),
                       ))
                   .toList(),
             ),
@@ -286,6 +325,13 @@ class _DialogoExamenEnviado extends StatefulWidget {
 
   @override
   State<_DialogoExamenEnviado> createState() => _DialogoExamenEnviadoState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(DoubleProperty('calificacion', calificacion))
+    ..add(ObjectFlagProperty<VoidCallback>.has('onAceptar', onAceptar));
+  }
 }
 
 class _DialogoExamenEnviadoState extends State<_DialogoExamenEnviado>

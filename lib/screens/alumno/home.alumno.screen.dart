@@ -1,11 +1,26 @@
+import 'package:aulago/models/anuncio.model.dart';
 import 'package:aulago/models/curso.model.dart';
+import 'package:aulago/models/fecha_importante.model.dart';
 import 'package:aulago/providers/auth.riverpod.dart';
+import 'package:aulago/repositories/anuncio.repository.dart';
 import 'package:aulago/repositories/curso.repository.dart';
+import 'package:aulago/repositories/fecha_importante.repository.dart';
 import 'package:aulago/screens/alumno/cursos.alumno.screen.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+// Providers para anuncios y fechas importantes
+final anunciosAlumnoProvider = FutureProvider<List<ModeloAnuncio>>((ref) {
+  final repo = AnuncioRepository();
+  return repo.obtenerAnuncios();
+});
+
+final fechasImportantesAlumnoProvider = FutureProvider<List<ModeloFechaImportante>>((ref) {
+  final repo = FechaImportanteRepository();
+  return repo.obtenerFechasImportantes();
+});
 
 class PantallaInicioAlumno extends ConsumerWidget {
   const PantallaInicioAlumno({super.key});
@@ -15,6 +30,8 @@ class PantallaInicioAlumno extends ConsumerWidget {
     final estadoAuth = ref.watch(proveedorAuthProvider);
     final estudiante = ref.watch(usuarioActualProvider);
     final cursosFuture = CursoRepository().obtenerCursos();
+    final anunciosAsync = ref.watch(anunciosAlumnoProvider);
+    final fechasAsync = ref.watch(fechasImportantesAlumnoProvider);
     final ancho = MediaQuery.of(context).size.width;
     final esMovil = ancho < 700;
 
@@ -57,9 +74,9 @@ class PantallaInicioAlumno extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 28),
-          _construirAnunciosGrande(const AsyncValue<List<Map<String, dynamic>>>.data([])),
+          _construirAnunciosGrande(anunciosAsync),
           const SizedBox(height: 28),
-          _construirFechasImportantesGrande(const AsyncValue<List<Map<String, dynamic>>>.data([])),
+          _construirFechasImportantesGrande(fechasAsync),
         ],
       );
     }
@@ -88,8 +105,8 @@ class PantallaInicioAlumno extends ConsumerWidget {
           ),
           const SizedBox(height: 40),
           _buildBottomSections(
-            const AsyncValue<List<Map<String, dynamic>>>.data([]),
-            const AsyncValue<List<Map<String, dynamic>>>.data([]),
+            anunciosAsync,
+            fechasAsync,
             true,
           ),
         ],
@@ -274,7 +291,7 @@ class PantallaInicioAlumno extends ConsumerWidget {
     );
   }
 
-  Widget _buildBottomSections(AsyncValue<List<Map<String, dynamic>>> anunciosAsync, AsyncValue<List<Map<String, dynamic>>> fechasAsync, bool esMovil) {
+  Widget _buildBottomSections(AsyncValue<List<ModeloAnuncio>> anunciosAsync, AsyncValue<List<ModeloFechaImportante>> fechasAsync, bool esMovil) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final ancho = constraints.maxWidth;
@@ -314,7 +331,7 @@ class PantallaInicioAlumno extends ConsumerWidget {
     );
   }
 
-  Widget _construirAnunciosGrande(AsyncValue<List<Map<String, dynamic>>> anunciosAsync) {
+  Widget _construirAnunciosGrande(AsyncValue<List<ModeloAnuncio>> anunciosAsync) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
@@ -412,8 +429,8 @@ class PantallaInicioAlumno extends ConsumerWidget {
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
                     child: ListTile(
-                      title: Text(anuncio['titulo'] ?? 'Sin título'),
-                      subtitle: Text(anuncio['contenido'] ?? 'Sin contenido'),
+                      title: Text(anuncio.titulo),
+                      subtitle: Text(anuncio.contenido),
                       leading: const Icon(LucideIcons.bell),
                     ),
                   );
@@ -430,7 +447,7 @@ class PantallaInicioAlumno extends ConsumerWidget {
     );
   }
 
-  Widget _construirFechasImportantesGrande(AsyncValue<List<Map<String, dynamic>>> fechasAsync) {
+  Widget _construirFechasImportantesGrande(AsyncValue<List<ModeloFechaImportante>> fechasAsync) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
@@ -518,8 +535,8 @@ class PantallaInicioAlumno extends ConsumerWidget {
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
                     child: ListTile(
-                      title: Text(fecha['titulo'] ?? 'Sin título'),
-                      subtitle: Text(fecha['descripcion'] ?? 'Sin descripción'),
+                      title: Text(fecha.titulo),
+                      subtitle: Text(fecha.descripcion ?? 'Sin descripción'),
                       leading: const Icon(LucideIcons.calendarCheck),
                     ),
                   );

@@ -22,7 +22,7 @@ class ExamenRepository extends BaseRepository<ModeloExamen> {
 
   @override
   String getId(ModeloExamen entity) {
-    return entity.id.toString();
+    return entity.id?.toString() ?? '';
   }
 
   // CRUD básico
@@ -101,17 +101,21 @@ class ExamenRepository extends BaseRepository<ModeloExamen> {
     required List<PreguntaExamen> preguntas,
   }) async {
     try {
+      if (examen.id == null) {
+        throw ArgumentError('No se puede actualizar un examen sin ID');
+      }
+      
       debugPrint('[$repositoryName] Actualizando examen ID: ${examen.id} con ${preguntas.length} preguntas');
       
       // 1. Actualizar el examen
-      final examenActualizado = await actualizarExamen(examen.id, examen);
+      final examenActualizado = await actualizarExamen(examen.id!, examen);
       
       // 2. Eliminar preguntas existentes
-      await eliminarPreguntasExamen(examen.id);
+      await eliminarPreguntasExamen(examen.id!);
       
       // 3. Crear las nuevas preguntas
       for (final pregunta in preguntas) {
-        final preguntaParaCrear = pregunta.copyWith(examenId: examen.id);
+        final preguntaParaCrear = pregunta.copyWith(examenId: examen.id!);
         await _crearPregunta(preguntaParaCrear);
       }
       
