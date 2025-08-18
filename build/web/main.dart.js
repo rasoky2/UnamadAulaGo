@@ -60337,7 +60337,7 @@ A.aTm.prototype={
 $0(){var s=0,r=A.n(t.H),q,p=this
 var $async$$0=A.j(function(a,b){if(a===1)return A.k(b,r)
 while(true)switch(s){case 0:s=3
-return A.f(A.b93("assets/download/app-release.apk","_self"),$async$$0)
+return A.f(A.b93("assets/assets/download/app-release.apk","_self"),$async$$0)
 case 3:if(!b&&p.a.c!=null)p.a.c.S(t.q).f.bx(A.cW(null,null,null,B.hH,B.c2,B.v,null,A.o("No se pudo iniciar la descarga.",null,null,null,A.db().$0(),null,null,null),null,B.a8,null,null,null,null,null,null,null,null,null))
 s=1
 break

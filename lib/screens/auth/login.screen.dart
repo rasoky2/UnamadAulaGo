@@ -441,9 +441,10 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                 height: 48,
                 child: OutlinedButton.icon(
                   onPressed: () async {
-                    const String assetPath = 'assets/download/app-release.apk';
                     if (kIsWeb) {
-                      final ok = await launchUrlString(assetPath, webOnlyWindowName: '_self');
+                      // En Flutter Web los assets se sirven bajo "/assets/assets/..."
+                      const String webAssetPath = 'assets/assets/download/app-release.apk';
+                      final ok = await launchUrlString(webAssetPath, webOnlyWindowName: '_self');
                       if (!ok && mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
