@@ -464,7 +464,7 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                       ),
                     );
                   },
-                  icon: const Icon(Icons.android),
+                  icon: const Icon(Icons.download),
                   label: Text(
                     'Descargar APK',
                     style: GoogleFonts.notoSans(fontWeight: FontWeight.w600),
