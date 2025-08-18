@@ -1553,7 +1553,6 @@ class _EntregaExamenCard extends StatelessWidget {
                   AvatarWidget(
                     fotoUrl: estudiante['foto_perfil_url'],
                     nombreCompleto: estudiante['nombre_completo'] ?? 'Estudiante',
-                    tipoUsuario: 'estudiante',
                     radio: 24,
                   ),
                   const SizedBox(width: 12),
@@ -1689,7 +1688,6 @@ class _DetalleEntregaWidget extends StatelessWidget {
                   AvatarWidget(
                     fotoUrl: estudiante['foto_perfil_url'],
                     nombreCompleto: estudiante['nombre_completo'],
-                    tipoUsuario: 'estudiante',
                     radio: 28,
                   ),
                   const SizedBox(width: 12),

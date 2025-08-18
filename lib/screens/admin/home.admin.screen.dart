@@ -226,6 +226,12 @@ class _EstadisticasAdicionales extends StatelessWidget {
       ],
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<EstadisticasAdmin>('estadisticas', estadisticas));
+  }
 }
 
 class _TarjetaEstadisticaAdicional extends StatelessWidget {
@@ -292,6 +298,16 @@ class _TarjetaEstadisticaAdicional extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(StringProperty('titulo', titulo))
+    ..add(StringProperty('valor', valor))
+    ..add(StringProperty('subtitulo', subtitulo))
+    ..add(DiagnosticsProperty<IconData>('icono', icono))
+    ..add(ColorProperty('color', color));
   }
 }
 
@@ -378,6 +394,7 @@ class _TarjetaEstadistica extends StatelessWidget {
       ..add(StringProperty('valor', valor))
       ..add(DiagnosticsProperty<IconData>('icono', icono))
       ..add(ColorProperty('color', color));
+      properties.add(StringProperty('subtitulo', subtitulo));
   }
 }
 
@@ -425,6 +442,12 @@ class _AlertasSistema extends StatelessWidget {
         ...alertas.map((alerta) => _TarjetaAlerta(alerta: alerta)),
       ],
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(IterableProperty<AlertaSistema>('alertas', alertas));
   }
 }
 
@@ -512,6 +535,12 @@ class _TarjetaAlerta extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<AlertaSistema>('alerta', alerta));
   }
 }
 

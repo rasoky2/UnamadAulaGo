@@ -32,7 +32,7 @@ class ProfesorRepository extends BaseRepository<ProfesorAdmin> {
           .select('*, usuarios:usuarios!fk_profesores_usuario(*), facultades:facultades!profesores_facultad_id_fkey(nombre)')
           .limit(1000);
       return List<Map<String, dynamic>>.from(response)
-          .map((e) => ProfesorAdmin.fromJson(e))
+          .map(ProfesorAdmin.fromJson)
           .toList();
     } catch (_) {
       // Fallback: sin join a facultades (evita permisos faltantes)
@@ -41,7 +41,7 @@ class ProfesorRepository extends BaseRepository<ProfesorAdmin> {
           .select('*, usuarios:usuarios!fk_profesores_usuario(*)')
           .limit(1000);
       return List<Map<String, dynamic>>.from(response)
-          .map((e) => ProfesorAdmin.fromJson(e))
+          .map(ProfesorAdmin.fromJson)
           .toList();
     }
   }
@@ -77,7 +77,9 @@ class ProfesorRepository extends BaseRepository<ProfesorAdmin> {
         .select('id')
         .eq('usuario_id', usuarioId)
         .maybeSingle();
-    if (resp == null || resp['id'] == null) return null;
+    if (resp == null || resp['id'] == null) {
+      return null;
+    }
     return (resp['id'] as num).toInt();
   }
 
@@ -121,7 +123,7 @@ class ProfesorRepository extends BaseRepository<ProfesorAdmin> {
 
     // 2) Obtener conteo de matriculados por curso (una sola llamada agrupada)
     final ids = cursos.map((c) => c['id']).toList();
-    Map<int, int> cursoIdToCount = {};
+    final Map<int, int> cursoIdToCount = {};
     if (ids.isNotEmpty) {
       final matriculasResp = await supabase
           .from('matriculas')

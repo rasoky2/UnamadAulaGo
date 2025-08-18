@@ -1,6 +1,7 @@
 import 'package:aulago/models/lectura.model.dart';
 import 'package:aulago/repositories/lectura.repository.dart';
 import 'package:aulago/utils/constants.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -10,6 +11,12 @@ class LecturasAlumnoWidget extends StatefulWidget {
 
   @override
   State<LecturasAlumnoWidget> createState() => _LecturasAlumnoWidgetState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(StringProperty('cursoId', cursoId));
+  }
 }
 
 class _LecturasAlumnoWidgetState extends State<LecturasAlumnoWidget> {

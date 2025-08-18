@@ -1,5 +1,5 @@
-import 'package:aulago/models/matricula.model.dart';
 import 'package:aulago/models/curso.model.dart';
+import 'package:aulago/models/matricula.model.dart';
 import 'package:aulago/models/usuario.model.dart';
 import 'package:aulago/repositories/base.repository.dart';
 
@@ -107,7 +107,9 @@ class MatriculaRepository extends BaseRepository<ModeloMatricula> {
     for (final item in (response as List)) {
       final data = Map<String, dynamic>.from(item);
       final cursoData = data['cursos'];
-      if (cursoData == null) continue;
+      if (cursoData == null) {
+        continue;
+      }
       final cursoJson = Map<String, dynamic>.from(cursoData as Map);
       final profesorData = cursoJson.remove('profesor');
 

@@ -38,7 +38,9 @@ class TareaRepository extends BaseRepository<ModeloTarea> {
           .eq('curso_id', cursoId)
           .order('fecha_entrega', ascending: true);
       
-      return (response as List).map((json) => fromJson(json)).toList();
+      return (response as List<dynamic>)
+          .map((item) => fromJson(item as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint('Error al obtener tareas por curso: $e');
       rethrow;

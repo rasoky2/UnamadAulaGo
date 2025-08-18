@@ -1105,7 +1105,6 @@ class _DialogoEntregaTareaState extends State<_DialogoEntregaTarea> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx', 'txt', 'zip', 'rar', 'jpg', 'jpeg', 'png'],
-        allowMultiple: false,
         withData: true, // IMPORTANTE: Captura los bytes del archivo
       );
 

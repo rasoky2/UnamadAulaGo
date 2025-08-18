@@ -35,7 +35,9 @@ class FechaImportanteRepository extends BaseRepository<ModeloFechaImportante> {
           .select()
           .order('fecha_evento', ascending: true);
       
-      final fechas = (response as List).map((json) => fromJson(json)).toList();
+      final List<ModeloFechaImportante> fechas = (response as List<dynamic>)
+          .map((item) => fromJson(item as Map<String, dynamic>))
+          .toList();
       debugPrint('[FechaImportanteRepository] ✅ Fechas importantes obtenidas: ${fechas.length}');
       return fechas;
     } catch (e) {

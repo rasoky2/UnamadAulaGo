@@ -157,14 +157,14 @@ class _PantallaMatriculasAdminState extends ConsumerState<PantallaMatriculasAdmi
                   return SizedBox(
                     width: 320,
                     child: DropdownButtonFormField<int>(
-                      value: _filtroCarreraId,
+                      initialValue: _filtroCarreraId,
                       decoration: const InputDecoration(
                         labelText: 'Filtrar por carrera',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
                       items: [
-                        const DropdownMenuItem<int>(value: null, child: Text('Todas las carreras')),
+                        const DropdownMenuItem<int>(child: Text('Todas las carreras')),
                         ...items.map((c) => DropdownMenuItem<int>(value: c.id, child: Text(c.nombre))),
                       ],
                       onChanged: (v) => setState(() => _filtroCarreraId = v),
@@ -225,7 +225,6 @@ class _PantallaMatriculasAdminState extends ConsumerState<PantallaMatriculasAdmi
             leading: AvatarWidget(
               fotoUrl: alumno.estudianteFotoUrl,
               nombreCompleto: alumnoNombre,
-              tipoUsuario: 'estudiante',
               radio: 18,
               mostrarBordeOnline: true,
             ),
@@ -384,7 +383,7 @@ class _DialogoMatriculaState extends ConsumerState<_DialogoMatricula> {
               children: [
                 // Carrera
                 DropdownButtonFormField<int>(
-                  value: _carreraId,
+                  initialValue: _carreraId,
                   decoration: const InputDecoration(labelText: 'Carrera *', border: OutlineInputBorder()),
                   items: _carreras
                       .map((c) => DropdownMenuItem<int>(value: c.id, child: Text(c.nombre)))
@@ -405,7 +404,7 @@ class _DialogoMatriculaState extends ConsumerState<_DialogoMatricula> {
 
                 // Curso (muestra profesor)
                 DropdownButtonFormField<int>(
-                  value: _cursoId,
+                  initialValue: _cursoId,
                   decoration: const InputDecoration(labelText: 'Curso *', border: OutlineInputBorder()),
                   items: _cursosDet
                       .map((cd) => DropdownMenuItem<int>(
@@ -420,7 +419,7 @@ class _DialogoMatriculaState extends ConsumerState<_DialogoMatricula> {
 
                 // Estudiante (filtrado por carrera)
                 DropdownButtonFormField<int>(
-                  value: _estudianteId,
+                  initialValue: _estudianteId,
                   decoration: const InputDecoration(labelText: 'Estudiante *', border: OutlineInputBorder()),
                   items: _estudiantes
                       .map((e) => DropdownMenuItem<int>(
@@ -435,7 +434,7 @@ class _DialogoMatriculaState extends ConsumerState<_DialogoMatricula> {
 
                 // Periodo Académico
                 DropdownButtonFormField<int>(
-                  value: _periodoId,
+                  initialValue: _periodoId,
                   decoration: const InputDecoration(labelText: 'Periodo Académico *', border: OutlineInputBorder()),
                   items: _periodos
                       .map((p) {

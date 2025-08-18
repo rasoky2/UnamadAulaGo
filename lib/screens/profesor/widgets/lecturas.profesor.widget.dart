@@ -151,11 +151,7 @@ class _LecturasTabState extends State<LecturasTab> {
         creditos: 0,
         horasTeoria: 0,
         horasPractica: 0,
-        semestreRecomendado: null,
         esObligatorio: false,
-        fechaCreacion: null,
-        profesorId: null,
-        descripcion: null,
       ),
     );
     return '${curso.codigoCurso} - ${curso.nombre}';
@@ -516,7 +512,7 @@ class _LecturasTabState extends State<LecturasTab> {
                 child: _cargandoCursos
                     ? const LinearProgressIndicator()
                     : DropdownButtonFormField<String>(
-                        value: _cursoSeleccionadoId,
+                        initialValue: _cursoSeleccionadoId,
                         decoration: const InputDecoration(
                           labelText: 'Curso',
                           border: OutlineInputBorder(),

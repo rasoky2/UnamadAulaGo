@@ -3,9 +3,10 @@ import 'package:aulago/models/usuario.model.dart';
 import 'package:aulago/repositories/profesor.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:aulago/widgets/avatar_widget.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 // import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final profesoresProvider = StateNotifierProvider<_ProfesoresNotifier, List<ProfesorAdmin>>((ref) {
@@ -313,6 +314,12 @@ class _DialogoContrasenaProfesor extends ConsumerStatefulWidget {
   final ProfesorAdmin profesor;
   @override
   ConsumerState<_DialogoContrasenaProfesor> createState() => _DialogoContrasenaProfesorState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<ProfesorAdmin>('profesor', profesor));
+  }
 }
 
 class _DialogoContrasenaProfesorState extends ConsumerState<_DialogoContrasenaProfesor> {
@@ -479,8 +486,12 @@ class _SheetCrearProfesorState extends ConsumerState<_SheetCrearProfesor> {
                                 suffixText: '@unamad.edu.pe',
                               ),
                               validator: (value) {
-                                if (value == null || value.trim().isEmpty) return 'Campo requerido';
-                                if (value.contains('@')) return 'Solo ingrese el usuario, sin @';
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Campo requerido';
+                                }
+                                if (value.contains('@')) {
+                                  return 'Solo ingrese el usuario, sin @';
+                                }
                                 return null;
                               },
                             )
@@ -493,11 +504,17 @@ class _SheetCrearProfesorState extends ConsumerState<_SheetCrearProfesor> {
                               ),
                               keyboardType: TextInputType.emailAddress,
                               validator: (value) {
-                                if (value == null || value.trim().isEmpty) return 'Campo requerido';
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Campo requerido';
+                                }
                                 final email = value.trim();
-                                if (!email.endsWith('@unamad.edu.pe')) return 'Debe ser dominio @unamad.edu.pe';
+                                if (!email.endsWith('@unamad.edu.pe')) {
+                                  return 'Debe ser dominio @unamad.edu.pe';
+                                }
                                 final local = email.split('@').first;
-                                if (local.isEmpty) return 'Ingrese el usuario antes de @unamad.edu.pe';
+                                if (local.isEmpty) {
+                                  return 'Ingrese el usuario antes de @unamad.edu.pe';
+                                }
                                 return null;
                               },
                             ),
@@ -565,7 +582,9 @@ class _SheetCrearProfesorState extends ConsumerState<_SheetCrearProfesor> {
   }
 
   Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     final now = DateTime.now();
     final correo = _bloquearDominioEmail
         ? '${_usuarioEmailController.text.trim()}@unamad.edu.pe'
@@ -592,7 +611,9 @@ class _SheetCrearProfesorState extends ConsumerState<_SheetCrearProfesor> {
       profesor,
       contrasena: _contrasenaController.text.trim(),
     );
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final nuevaClave = _contrasenaController.text.trim();
     if (nuevaClave.isNotEmpty) {
       try {
@@ -617,6 +638,12 @@ class _SheetEditarProfesor extends ConsumerStatefulWidget {
   final ProfesorAdmin profesor;
   @override
   ConsumerState<_SheetEditarProfesor> createState() => _SheetEditarProfesorState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<ProfesorAdmin>('profesor', profesor));
+  }
 }
 
 class _SheetEditarProfesorState extends ConsumerState<_SheetEditarProfesor> {
@@ -698,11 +725,17 @@ class _SheetEditarProfesorState extends ConsumerState<_SheetEditarProfesor> {
                   decoration: const InputDecoration(labelText: 'Email *', hintText: 'usuario@unamad.edu.pe', border: OutlineInputBorder()),
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Campo requerido';
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Campo requerido';
+                    }
                     final email = v.trim();
-                    if (!email.endsWith('@unamad.edu.pe')) return 'Debe ser dominio @unamad.edu.pe';
+                    if (!email.endsWith('@unamad.edu.pe')) {
+                      return 'Debe ser dominio @unamad.edu.pe';
+                    }
                     final local = email.split('@').first;
-                    if (local.isEmpty) return 'Ingrese el usuario antes de @unamad.edu.pe';
+                    if (local.isEmpty) {
+                      return 'Ingrese el usuario antes de @unamad.edu.pe';
+                    }
                     return null;
                   },
                 ),
@@ -729,7 +762,9 @@ class _SheetEditarProfesorState extends ConsumerState<_SheetEditarProfesor> {
                   decoration: const InputDecoration(labelText: 'Nueva contraseña (opcional)', border: OutlineInputBorder()),
                   obscureText: true,
                   validator: (v) {
-                    if (v != null && v.trim().isNotEmpty && v.trim().length < 6) return 'Mínimo 6 caracteres';
+                    if (v != null && v.trim().isNotEmpty && v.trim().length < 6) {
+                      return 'Mínimo 6 caracteres';
+                    }
                     return null;
                   },
                 ),
@@ -760,7 +795,9 @@ class _SheetEditarProfesorState extends ConsumerState<_SheetEditarProfesor> {
   }
 
   Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     final now = DateTime.now();
     final usuario = widget.profesor.usuario.copyWith(
       codigoUsuario: _codigoController.text.trim(),
@@ -775,7 +812,9 @@ class _SheetEditarProfesorState extends ConsumerState<_SheetEditarProfesor> {
       fechaActualizacion: now,
     );
     final success = await ref.read(profesoresProvider.notifier).actualizarProfesor(profesor.id, profesor);
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final nuevaClave = _contrasenaController.text.trim();
     if (nuevaClave.isNotEmpty) {
       try {

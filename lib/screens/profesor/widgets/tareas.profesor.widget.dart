@@ -48,6 +48,12 @@ class TareasTab extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<TareasTab> createState() => _TareasTabState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(StringProperty('cursoId', cursoId));
+  }
 }
 
 class _TareasTabState extends ConsumerState<TareasTab> {
@@ -57,7 +63,7 @@ class _TareasTabState extends ConsumerState<TareasTab> {
     final tareasAsync = ref.watch(tareasCursoProvider(widget.cursoId));
     
     return tareasAsync.when(
-      data: (tareas) => _buildTareasContent(tareas),
+      data: _buildTareasContent,
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) => _buildErrorContent(error),
     );
@@ -118,7 +124,7 @@ class _TareasTabState extends ConsumerState<TareasTab> {
           tarea: tarea,
           onEdit: () => _mostrarDialogoTarea(context, tareaExistente: tarea),
           onGrade: () => _navegarACalificacion(tarea),
-          onDelete: () => _refrescarTareas(),
+          onDelete: _refrescarTareas,
         );
       },
     );
@@ -233,6 +239,15 @@ class _TareaCard extends StatefulWidget {
 
   @override
   State<_TareaCard> createState() => _TareaCardState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<ModeloTarea>('tarea', tarea));
+    properties.add(ObjectFlagProperty<VoidCallback>.has('onEdit', onEdit));
+    properties.add(ObjectFlagProperty<VoidCallback>.has('onGrade', onGrade));
+    properties.add(ObjectFlagProperty<VoidCallback>.has('onDelete', onDelete));
+  }
 }
 
 class _TareaCardState extends State<_TareaCard> {
@@ -758,6 +773,13 @@ class _EntregasListWidget extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<_EntregasListWidget> createState() => _EntregasListWidgetState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<ModeloTarea>('tarea', tarea));
+    properties.add(DiagnosticsProperty<ScrollController>('scrollController', scrollController));
+  }
 }
 
 class _EntregasListWidgetState extends ConsumerState<_EntregasListWidget> {
@@ -772,7 +794,7 @@ class _EntregasListWidgetState extends ConsumerState<_EntregasListWidget> {
     final entregasAsync = ref.watch(entregasTareaProvider(widget.tarea.id));
     
     return entregasAsync.when(
-      data: (entregas) => _buildEntregasContent(entregas),
+      data: _buildEntregasContent,
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) => _buildErrorContent(error),
     );
@@ -887,8 +909,6 @@ class _EntregaCard extends StatelessWidget {
                 AvatarWidget(
                   fotoUrl: estudiante['foto_perfil_url'] as String?,
                   nombreCompleto: estudiante['nombre_completo'] as String? ?? 'Sin nombre',
-                  tipoUsuario: 'estudiante',
-                  radio: 20,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1066,6 +1086,15 @@ class _EntregaCard extends StatelessWidget {
         return Colors.grey;
     }
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<ModeloEntrega>('entrega', entrega));
+    properties.add(DiagnosticsProperty<Map<String, dynamic>>('estudiante', estudiante));
+    properties.add(DiagnosticsProperty<ModeloTarea>('tarea', tarea));
+    properties.add(ObjectFlagProperty<VoidCallback>.has('onActualizado', onActualizado));
+  }
 }
 
 /// Chip para mostrar un archivo adjunto
@@ -1137,6 +1166,12 @@ class _ArchivoChip extends StatelessWidget {
       debugPrint('Error al descargar archivo: $e');
     }
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<ArchivoAdjunto>('archivo', archivo));
+  }
 }
 
 /// Muestra el diálogo para calificar una entrega
@@ -1170,6 +1205,14 @@ class _DialogoCalificacion extends StatefulWidget {
 
   @override
   State<_DialogoCalificacion> createState() => _DialogoCalificacionState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<ModeloEntrega>('entrega', entrega));
+    properties.add(DiagnosticsProperty<ModeloTarea>('tarea', tarea));
+    properties.add(ObjectFlagProperty<VoidCallback>.has('onActualizado', onActualizado));
+  }
 }
 
 class _DialogoCalificacionState extends State<_DialogoCalificacion> {

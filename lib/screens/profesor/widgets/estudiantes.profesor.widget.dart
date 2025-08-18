@@ -234,7 +234,6 @@ class EstudiantesTab extends ConsumerWidget {
               AvatarWidget(
                 nombreCompleto: estudiante.nombreCompleto,
                 fotoUrl: estudiante.fotoPerfilUrl,
-                tipoUsuario: 'estudiante',
                 radio: 24,
               ),
               const SizedBox(width: 16),
