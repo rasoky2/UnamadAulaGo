@@ -11,7 +11,9 @@
 .swiftpm/
 migrate_working_dir/
 arquitecture.md
-build/*
+build/
+!build/web/
+!build/web/**
 
 
 # Flutter/Dart/Pub related
