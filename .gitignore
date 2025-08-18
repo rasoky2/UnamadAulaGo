@@ -11,6 +11,8 @@
 .swiftpm/
 migrate_working_dir/
 arquitecture.md
+build/*
+
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -21,12 +23,11 @@ arquitecture.md
 .pub-cache/
 .pub/
 
-build/
 
 
 
 pubspec.lock
-!build/web
+
 
 # Android Studio will place build artifacts here
 /android/app/debug
