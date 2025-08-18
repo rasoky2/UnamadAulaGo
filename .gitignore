@@ -11,10 +11,12 @@
 .swiftpm/
 migrate_working_dir/
 arquitecture.md
-build/**
-
+build/
 !build/web/
 !build/web/**
+
+# APK assets (no versionar)
+assets/download/*.apk
 
 
 # Flutter/Dart/Pub related
