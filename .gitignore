@@ -21,8 +21,11 @@ arquitecture.md
 .pub-cache/
 .pub/
 
-pubspec.lock
+build/
 
+
+
+pubspec.lock
 !build/web
 
 # Android Studio will place build artifacts here
