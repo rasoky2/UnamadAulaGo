@@ -91,8 +91,15 @@ class EstudianteRepository extends BaseRepository<EstudianteAdmin> {
     }
   }
 
-  Future<EstudianteAdmin> crearEstudiante(EstudianteAdmin estudiante) async {
-    return crear(estudiante.toJson());
+  Future<EstudianteAdmin> crearEstudiante(
+    EstudianteAdmin estudiante, {
+    required String contrasena,
+  }) async {
+    // La columna contrasena_hash es NOT NULL en la tabla 'estudiantes'.
+    // Incluirla en el payload de creación para evitar violar la restricción.
+    final Map<String, dynamic> data = estudiante.toJson();
+    data['contrasena_hash'] = contrasena;
+    return crear(data);
   }
 
   Future<EstudianteAdmin> actualizarEstudiante(int id, EstudianteAdmin estudiante) async {

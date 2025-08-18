@@ -449,7 +449,7 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
   bool _aleatorizarPreguntas = false;
   
   // Lista de preguntas
-  List<PreguntaTemporal> _preguntas = [];
+  final List<PreguntaTemporal> _preguntas = [];
   
   // Estado
   int _pasoActual = 0;
@@ -987,7 +987,7 @@ class _PantallaCrearExamenState extends ConsumerState<_PantallaCrearExamen> {
             const SizedBox(height: 16),
 
             DropdownButtonFormField<String>(
-              value: _tipoExamen,
+              initialValue: _tipoExamen,
               decoration: const InputDecoration(
                 labelText: 'Tipo de examen',
                 border: OutlineInputBorder(),
@@ -1222,6 +1222,13 @@ class _EntregasExamenWidget extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<_EntregasExamenWidget> createState() => _EntregasExamenWidgetState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(DiagnosticsProperty<ModeloExamen>('examen', examen))
+    ..add(DiagnosticsProperty<ScrollController>('scrollController', scrollController));
+  }
 }
 
 class _EntregasExamenWidgetState extends ConsumerState<_EntregasExamenWidget> {
@@ -1502,6 +1509,15 @@ class _EstadisticaCard extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(StringProperty('titulo', titulo))
+    ..add(StringProperty('valor', valor))
+    ..add(DiagnosticsProperty<IconData>('icono', icono))
+    ..add(ColorProperty('color', color));
+  }
 }
 
 class _EntregaExamenCard extends StatelessWidget {
@@ -1627,6 +1643,15 @@ class _EntregaExamenCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(DiagnosticsProperty<ExamenEntrega>('entrega', entrega))
+    ..add(DiagnosticsProperty<Map<String, dynamic>>('estudiante', estudiante))
+    ..add(DiagnosticsProperty<ModeloExamen>('examen', examen))
+    ..add(ObjectFlagProperty<VoidCallback>.has('onVerDetalle', onVerDetalle));
   }
 }
 
@@ -1761,6 +1786,16 @@ class _DetalleEntregaWidget extends StatelessWidget {
       ],
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(DiagnosticsProperty<ExamenEntrega>('entrega', entrega))
+    ..add(DiagnosticsProperty<Map<String, dynamic>>('estudiante', estudiante))
+    ..add(DiagnosticsProperty<ModeloExamen>('examen', examen))
+    ..add(DiagnosticsProperty<Future<List<PreguntaExamen>>>('preguntas', preguntas))
+    ..add(DiagnosticsProperty<ScrollController>('scrollController', scrollController));
+  }
 }
 
 class _InfoChip extends StatelessWidget {
@@ -1799,6 +1834,14 @@ class _InfoChip extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(DiagnosticsProperty<IconData>('icono', icono))
+    ..add(StringProperty('texto', texto))
+    ..add(ColorProperty('color', color));
   }
 }
 
@@ -1973,6 +2016,14 @@ class _PreguntaRespuestaCard extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(DiagnosticsProperty<PreguntaExamen>('pregunta', pregunta))
+    ..add(DiagnosticsProperty<RespuestaExamen>('respuesta', respuesta))
+    ..add(IntProperty('numeroPregunta', numeroPregunta));
+  }
 }
 
 // ==================== WIDGET DE PUNTAJES DEL EXAMEN ====================
@@ -1988,6 +2039,13 @@ class _PuntajesExamenWidget extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<_PuntajesExamenWidget> createState() => _PuntajesExamenWidgetState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(DiagnosticsProperty<ModeloExamen>('examen', examen))
+    ..add(DiagnosticsProperty<ScrollController>('scrollController', scrollController));
+  }
 }
 
 class _PuntajesExamenWidgetState extends ConsumerState<_PuntajesExamenWidget> {
@@ -2249,6 +2307,15 @@ class _EstadisticaPuntajeCard extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(StringProperty('titulo', titulo))
+    ..add(StringProperty('valor', valor))
+    ..add(DiagnosticsProperty<IconData>('icono', icono))
+    ..add(ColorProperty('color', color));
+  }
 }
 
 class _PuntajeAlumnoCard extends StatelessWidget {
@@ -2403,5 +2470,14 @@ class _PuntajeAlumnoCard extends StatelessWidget {
       default:
         return Colors.blue.shade600; // Azul para el resto
     }
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties..add(DiagnosticsProperty<ExamenEntrega>('entrega', entrega))
+    ..add(DiagnosticsProperty<Map<String, dynamic>>('estudiante', estudiante))
+    ..add(IntProperty('posicion', posicion))
+    ..add(DiagnosticsProperty<ModeloExamen>('examen', examen));
   }
 }

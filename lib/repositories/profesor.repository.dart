@@ -70,8 +70,34 @@ class ProfesorRepository extends BaseRepository<ProfesorAdmin> {
     }
   }
 
-  Future<ProfesorAdmin> crearProfesor(ProfesorAdmin profesor) async {
-    return crear(profesor.toJson());
+  /// Obtiene el id del profesor a partir del usuario_id (tabla usuarios)
+  Future<int?> obtenerProfesorIdPorUsuarioId(int usuarioId) async {
+    final resp = await supabase
+        .from(tableName)
+        .select('id')
+        .eq('usuario_id', usuarioId)
+        .maybeSingle();
+    if (resp == null || resp['id'] == null) return null;
+    return (resp['id'] as num).toInt();
+  }
+
+  Future<ProfesorAdmin> crearProfesor(ProfesorAdmin profesor, {required String contrasena}) async {
+    // Construir payload conforme a columnas NOT NULL en 'profesores'
+    final data = <String, dynamic>{
+      'codigo_profesor': profesor.usuario.codigoUsuario,
+      'nombre_completo': profesor.usuario.nombreCompleto,
+      'correo_electronico': profesor.usuario.correoElectronico,
+      'contrasena_hash': contrasena,
+      'usuario_id': (profesor.usuario.id > 0) ? profesor.usuario.id : null,
+      'especialidad': profesor.especialidad,
+      'grado_academico': profesor.gradoAcademico,
+      'facultad_id': profesor.facultadId == null ? null : int.tryParse(profesor.facultadId!),
+      'estado': profesor.estado,
+      'fecha_creacion': profesor.fechaCreacion.toIso8601String(),
+      'fecha_actualizacion': profesor.fechaActualizacion.toIso8601String(),
+      'foto_perfil_url': profesor.usuario.fotoPerfilUrl,
+    };
+    return crear(data);
   }
 
   Future<ProfesorAdmin> actualizarProfesor(int id, ProfesorAdmin profesor) async {

@@ -1,5 +1,8 @@
 import 'package:aulago/models/curso.model.dart';
+import 'package:aulago/models/usuario.model.dart';
+import 'package:aulago/providers/auth.riverpod.dart';
 import 'package:aulago/repositories/curso.repository.dart';
+import 'package:aulago/repositories/profesor.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -169,7 +172,7 @@ class PantallaDashboardProfesor extends ConsumerWidget {
         ),
         const SizedBox(height: AppConstants.defaultPadding),
         FutureBuilder<List<ModeloCurso>>(
-          future: CursoRepository().obtenerTodos(),
+          future: _obtenerCursosDelProfesor(context),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
@@ -188,6 +191,44 @@ class PantallaDashboardProfesor extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<List<ModeloCurso>> _obtenerCursosDelProfesor(BuildContext context) async {
+    // Obtener usuario actual
+    final container = ProviderScope.containerOf(context, listen: false);
+    final ModeloUsuario? usuario = container.read(usuarioActualProvider);
+    if (usuario == null) {
+      return [];
+    }
+    // Encontrar profesor_id por usuario_id
+    final profesorRepo = ProfesorRepository();
+    final profesorId = await profesorRepo.obtenerProfesorIdPorUsuarioId(usuario.id);
+    if (profesorId == null) {
+      return [];
+    }
+    // Reusar cursos por profesor si existe endpoint específico
+    try {
+      // Si tuvieras en CursoRepository un método obtenerCursosPorProfesor(profesorId) sería ideal.
+      // Por ahora, como fallback, traemos todos y filtramos por profesor_id si el modelo tiene ese campo.
+      final cursos = await CursoRepository().obtenerCursos();
+      return cursos.where((c) {
+        try {
+          final anyJson = c.toJson();
+          final pid = anyJson['profesor_id'];
+          if (pid is int) {
+            return pid == profesorId;
+          }
+          if (pid is String) {
+            return int.tryParse(pid) == profesorId;
+          }
+          return false;
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Widget _construirListaCursos(BuildContext context, List<ModeloCurso> cursos) {

@@ -3,7 +3,8 @@ import 'package:aulago/models/usuario.model.dart';
 import 'package:aulago/repositories/profesor.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:aulago/widgets/avatar_widget.dart';
-import 'package:flutter/foundation.dart';
+// import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,9 +21,9 @@ class _ProfesoresNotifier extends StateNotifier<List<ProfesorAdmin>> {
     final lista = await _repo.obtenerProfesores();
     state = lista;
   }
-  Future<bool> crearProfesor(ProfesorAdmin profesor) async {
+  Future<bool> crearProfesor(ProfesorAdmin profesor, {required String contrasena}) async {
     try {
-      await _repo.crearProfesor(profesor);
+      await _repo.crearProfesor(profesor, contrasena: contrasena);
       await cargarProfesores();
       return true;
     } catch (_) {
@@ -104,7 +105,7 @@ class _PantallaProfesoresAdminState extends ConsumerState<PantallaProfesoresAdmi
           ),
           const SizedBox(width: 8),
           ElevatedButton.icon(
-            onPressed: () => _mostrarDialogoProfesor(context),
+            onPressed: () => _mostrarSheetCrearProfesor(context),
             icon: const Icon(Icons.add),
             label: const Text('Nuevo Profesor'),
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
@@ -218,7 +219,7 @@ class _PantallaProfesoresAdminState extends ConsumerState<PantallaProfesoresAdmi
                   alignment: WrapAlignment.end,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: () => _mostrarDialogoEditarProfesor(context, profesor),
+                      onPressed: () => _mostrarSheetEditarProfesor(context, profesor),
                       icon: const Icon(Icons.edit),
                       label: const Text('Editar perfil'),
                     ),
@@ -241,17 +242,27 @@ class _PantallaProfesoresAdminState extends ConsumerState<PantallaProfesoresAdmi
       },
     );
   }
-  void _mostrarDialogoProfesor(BuildContext context, [ProfesorAdmin? profesor]) {
-    showDialog(
+  // Diálogo clásico removido: usamos bottom sheets
+
+  void _mostrarSheetCrearProfesor(BuildContext context) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => _DialogoProfesor(profesor: profesor),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => const _SheetCrearProfesor(),
     );
   }
 
-  void _mostrarDialogoEditarProfesor(BuildContext context, ProfesorAdmin profesor) {
-    showDialog(
+  void _mostrarSheetEditarProfesor(BuildContext context, ProfesorAdmin profesor) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => _DialogoProfesor(profesor: profesor),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _SheetEditarProfesor(profesor: profesor),
     );
   }
 
@@ -295,188 +306,7 @@ class _PantallaProfesoresAdminState extends ConsumerState<PantallaProfesoresAdmi
   }
 }
 
-class _DialogoProfesor extends ConsumerStatefulWidget {
-  const _DialogoProfesor({this.profesor});
-  final ProfesorAdmin? profesor;
-  @override
-  ConsumerState<_DialogoProfesor> createState() => _DialogoProfesorState();
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty<ProfesorAdmin?>('profesor', profesor));
-  }
-}
-class _DialogoProfesorState extends ConsumerState<_DialogoProfesor> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nombreController;
-  late final TextEditingController _codigoController;
-  late final TextEditingController _emailController;
-  late final TextEditingController _especialidadController;
-  late final TextEditingController _gradoController;
-  late bool _activo;
-  final TextEditingController _contrasenaController = TextEditingController();
-  @override
-  void initState() {
-    super.initState();
-    _nombreController = TextEditingController(text: widget.profesor?.nombreCompleto ?? '');
-    _codigoController = TextEditingController(text: widget.profesor?.codigoProfesor ?? '');
-    _emailController = TextEditingController(text: widget.profesor?.correoElectronico ?? '');
-    _especialidadController = TextEditingController(text: widget.profesor?.especialidad ?? '');
-    _gradoController = TextEditingController(text: widget.profesor?.gradoAcademico ?? '');
-    _activo = widget.profesor?.activo ?? true;
-  }
-  @override
-  void dispose() {
-    _nombreController.dispose();
-    _codigoController.dispose();
-    _emailController.dispose();
-    _especialidadController.dispose();
-    _gradoController.dispose();
-    _contrasenaController.dispose();
-    super.dispose();
-  }
-  @override
-  Widget build(BuildContext context) {
-    final esEdicion = widget.profesor != null;
-    return AlertDialog(
-      title: Text(esEdicion ? 'Editar Profesor' : 'Nuevo Profesor'),
-      content: SizedBox(
-        width: 400,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _codigoController,
-                decoration: const InputDecoration(labelText: 'Código de Profesor *', border: OutlineInputBorder()),
-                validator: (value) => value?.isEmpty == true ? 'Campo requerido' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _nombreController,
-                decoration: const InputDecoration(labelText: 'Nombre Completo *', border: OutlineInputBorder()),
-                validator: (value) => value?.isEmpty == true ? 'Campo requerido' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email *', border: OutlineInputBorder()),
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value?.isEmpty == true) {
-                    return 'Campo requerido';
-                  }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}').hasMatch(value!)) {
-                    return 'Email inválido';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              // Campo de contraseña (opcional en edición, requerido en creación)
-              TextFormField(
-                controller: _contrasenaController,
-                decoration: InputDecoration(
-                  labelText: widget.profesor == null ? 'Contraseña *' : 'Contraseña (dejar en blanco para no cambiar)',
-                  border: const OutlineInputBorder(),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (widget.profesor == null && (value == null || value.trim().isEmpty)) {
-                    return 'Ingrese una contraseña';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _especialidadController,
-                decoration: const InputDecoration(labelText: 'Especialidad', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _gradoController,
-                decoration: const InputDecoration(labelText: 'Grado académico', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                value: _activo,
-                onChanged: (v) => setState(() => _activo = v),
-                title: const Text('Activo'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: _guardarProfesor,
-          child: Text(esEdicion ? 'Actualizar' : 'Crear'),
-        ),
-      ],
-    );
-  }
-  Future<void> _guardarProfesor() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    final now = DateTime.now();
-    final usuario = widget.profesor?.usuario ?? ModeloUsuario(
-      id: 0,
-      codigoUsuario: _codigoController.text.trim(),
-      nombreCompleto: _nombreController.text.trim(),
-      correoElectronico: _emailController.text.trim(),
-      rol: 'profesor',
-      activo: _activo,
-      fechaCreacion: now,
-    );
-    final profesor = ProfesorAdmin(
-      id: widget.profesor?.id ?? '',
-      usuario: usuario.copyWith(
-        codigoUsuario: _codigoController.text.trim(),
-        nombreCompleto: _nombreController.text.trim(),
-        correoElectronico: _emailController.text.trim(),
-        activo: _activo,
-      ),
-      especialidad: _especialidadController.text.trim().isEmpty ? null : _especialidadController.text.trim(),
-      gradoAcademico: _gradoController.text.trim().isEmpty ? null : _gradoController.text.trim(),
-      fechaCreacion: widget.profesor?.fechaCreacion ?? now,
-      fechaActualizacion: now,
-    );
-    final notifier = ref.read(profesoresProvider.notifier);
-    final creando = widget.profesor == null;
-    final success = creando
-        ? await notifier.crearProfesor(profesor)
-        : await notifier.actualizarProfesor(profesor.id, profesor);
-    if (!mounted) {
-      return;
-    }
-    // Si es creación o si se envió nueva contraseña, sincronizar en BD usuarios/profesores
-    final nuevaClave = _contrasenaController.text.trim();
-    if (nuevaClave.isNotEmpty) {
-      try {
-        await ProfesorRepository().actualizarContrasenaPorCodigo(
-          codigoProfesor: _codigoController.text.trim(),
-          nuevaContrasena: nuevaClave,
-        );
-      } catch (_) {}
-    }
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(success ? 'Profesor guardado exitosamente' : 'Error al guardar profesor'),
-        backgroundColor: success ? Colors.green : Colors.red,
-      ),
-    );
-  }
-} 
+// Fin: diálogo clásico eliminado en favor de bottom sheets
 
 class _DialogoContrasenaProfesor extends ConsumerStatefulWidget {
   const _DialogoContrasenaProfesor({required this.profesor});
@@ -560,5 +390,408 @@ class _DialogoContrasenaProfesorState extends ConsumerState<_DialogoContrasenaPr
         setState(() => _guardando = false);
       }
     }
+  }
+}
+
+class _SheetCrearProfesor extends ConsumerStatefulWidget {
+  const _SheetCrearProfesor();
+  @override
+  ConsumerState<_SheetCrearProfesor> createState() => _SheetCrearProfesorState();
+}
+
+class _SheetCrearProfesorState extends ConsumerState<_SheetCrearProfesor> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _codigoController = TextEditingController();
+  final TextEditingController _nombreController = TextEditingController();
+  final TextEditingController _usuarioEmailController = TextEditingController();
+  final TextEditingController _emailFullController = TextEditingController();
+  final TextEditingController _especialidadController = TextEditingController();
+  final TextEditingController _gradoController = TextEditingController();
+  final TextEditingController _contrasenaController = TextEditingController();
+  bool _activo = true;
+  bool _bloquearDominioEmail = true;
+
+  @override
+  void dispose() {
+    _codigoController.dispose();
+    _nombreController.dispose();
+    _usuarioEmailController.dispose();
+    _emailFullController.dispose();
+    _especialidadController.dispose();
+    _gradoController.dispose();
+    _contrasenaController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: AppConstants.defaultPadding,
+          right: AppConstants.defaultPadding,
+          top: AppConstants.defaultPadding,
+          bottom: viewInsets + AppConstants.defaultPadding,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Nuevo Profesor', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    ),
+                    IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _codigoController,
+                  decoration: const InputDecoration(labelText: 'Código de Profesor *', border: OutlineInputBorder()),
+                  inputFormatters: [LengthLimitingTextInputFormatter(12)],
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Campo requerido' : null,
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _nombreController,
+                  decoration: const InputDecoration(labelText: 'Nombre Completo *', border: OutlineInputBorder()),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Campo requerido' : null,
+                ),
+                const SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _bloquearDominioEmail
+                          ? TextFormField(
+                              controller: _usuarioEmailController,
+                              decoration: const InputDecoration(
+                                labelText: 'Usuario del correo *',
+                                hintText: 'usuario',
+                                border: OutlineInputBorder(),
+                                suffixText: '@unamad.edu.pe',
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) return 'Campo requerido';
+                                if (value.contains('@')) return 'Solo ingrese el usuario, sin @';
+                                return null;
+                              },
+                            )
+                          : TextFormField(
+                              controller: _emailFullController,
+                              decoration: const InputDecoration(
+                                labelText: 'Email *',
+                                hintText: 'usuario@unamad.edu.pe',
+                                border: OutlineInputBorder(),
+                              ),
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) return 'Campo requerido';
+                                final email = value.trim();
+                                if (!email.endsWith('@unamad.edu.pe')) return 'Debe ser dominio @unamad.edu.pe';
+                                final local = email.split('@').first;
+                                if (local.isEmpty) return 'Ingrese el usuario antes de @unamad.edu.pe';
+                                return null;
+                              },
+                            ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => setState(() => _bloquearDominioEmail = !_bloquearDominioEmail),
+                      icon: Icon(_bloquearDominioEmail ? Icons.lock : Icons.lock_open),
+                      tooltip: _bloquearDominioEmail ? 'Desbloquear dominio' : 'Bloquear dominio',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _especialidadController,
+                  decoration: const InputDecoration(labelText: 'Especialidad', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _gradoController,
+                  decoration: const InputDecoration(labelText: 'Grado académico', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+
+                SwitchListTile(
+                  value: _activo,
+                  onChanged: (v) => setState(() => _activo = v),
+                  title: const Text('Activo'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _contrasenaController,
+                  decoration: const InputDecoration(labelText: 'Contraseña *', border: OutlineInputBorder()),
+                  obscureText: true,
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Ingrese una contraseña' : null,
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _guardar,
+                        child: const Text('Crear'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _guardar() async {
+    if (!_formKey.currentState!.validate()) return;
+    final now = DateTime.now();
+    final correo = _bloquearDominioEmail
+        ? '${_usuarioEmailController.text.trim()}@unamad.edu.pe'
+        : _emailFullController.text.trim();
+
+    final usuario = ModeloUsuario(
+      id: 0,
+      codigoUsuario: _codigoController.text.trim(),
+      nombreCompleto: _nombreController.text.trim(),
+      correoElectronico: correo,
+      rol: 'profesor',
+      activo: _activo,
+      fechaCreacion: now,
+    );
+    final profesor = ProfesorAdmin(
+      id: '',
+      usuario: usuario,
+      especialidad: _especialidadController.text.trim().isEmpty ? null : _especialidadController.text.trim(),
+      gradoAcademico: _gradoController.text.trim().isEmpty ? null : _gradoController.text.trim(),
+      fechaCreacion: now,
+      fechaActualizacion: now,
+    );
+    final success = await ref.read(profesoresProvider.notifier).crearProfesor(
+      profesor,
+      contrasena: _contrasenaController.text.trim(),
+    );
+    if (!mounted) return;
+    final nuevaClave = _contrasenaController.text.trim();
+    if (nuevaClave.isNotEmpty) {
+      try {
+        await ProfesorRepository().actualizarContrasenaPorCodigo(
+          codigoProfesor: _codigoController.text.trim(),
+          nuevaContrasena: nuevaClave,
+        );
+      } catch (_) {}
+    }
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'Profesor creado' : 'Error al crear profesor'),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+  }
+}
+
+class _SheetEditarProfesor extends ConsumerStatefulWidget {
+  const _SheetEditarProfesor({required this.profesor});
+  final ProfesorAdmin profesor;
+  @override
+  ConsumerState<_SheetEditarProfesor> createState() => _SheetEditarProfesorState();
+}
+
+class _SheetEditarProfesorState extends ConsumerState<_SheetEditarProfesor> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _codigoController;
+  late final TextEditingController _nombreController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _especialidadController;
+  late final TextEditingController _gradoController;
+  late final TextEditingController _contrasenaController;
+  late bool _activo;
+
+  @override
+  void initState() {
+    super.initState();
+    _codigoController = TextEditingController(text: widget.profesor.codigoProfesor);
+    _nombreController = TextEditingController(text: widget.profesor.nombreCompleto);
+    _emailController = TextEditingController(text: widget.profesor.correoElectronico ?? '');
+    _especialidadController = TextEditingController(text: widget.profesor.especialidad ?? '');
+    _gradoController = TextEditingController(text: widget.profesor.gradoAcademico ?? '');
+    _contrasenaController = TextEditingController();
+    _activo = widget.profesor.activo;
+  }
+
+  @override
+  void dispose() {
+    _codigoController.dispose();
+    _nombreController.dispose();
+    _emailController.dispose();
+    _especialidadController.dispose();
+    _gradoController.dispose();
+    _contrasenaController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: AppConstants.defaultPadding,
+          right: AppConstants.defaultPadding,
+          top: AppConstants.defaultPadding,
+          bottom: viewInsets + AppConstants.defaultPadding,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Editar Profesor', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    ),
+                    IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _codigoController,
+                  decoration: const InputDecoration(labelText: 'Código de Profesor *', border: OutlineInputBorder()),
+                  inputFormatters: [LengthLimitingTextInputFormatter(12)],
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Campo requerido' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _nombreController,
+                  decoration: const InputDecoration(labelText: 'Nombre Completo *', border: OutlineInputBorder()),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Campo requerido' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: 'Email *', hintText: 'usuario@unamad.edu.pe', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Campo requerido';
+                    final email = v.trim();
+                    if (!email.endsWith('@unamad.edu.pe')) return 'Debe ser dominio @unamad.edu.pe';
+                    final local = email.split('@').first;
+                    if (local.isEmpty) return 'Ingrese el usuario antes de @unamad.edu.pe';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _especialidadController,
+                  decoration: const InputDecoration(labelText: 'Especialidad', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _gradoController,
+                  decoration: const InputDecoration(labelText: 'Grado académico', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  value: _activo,
+                  onChanged: (v) => setState(() => _activo = v),
+                  title: const Text('Activo'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _contrasenaController,
+                  decoration: const InputDecoration(labelText: 'Nueva contraseña (opcional)', border: OutlineInputBorder()),
+                  obscureText: true,
+                  validator: (v) {
+                    if (v != null && v.trim().isNotEmpty && v.trim().length < 6) return 'Mínimo 6 caracteres';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _guardar,
+                        child: const Text('Guardar cambios'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _guardar() async {
+    if (!_formKey.currentState!.validate()) return;
+    final now = DateTime.now();
+    final usuario = widget.profesor.usuario.copyWith(
+      codigoUsuario: _codigoController.text.trim(),
+      nombreCompleto: _nombreController.text.trim(),
+      correoElectronico: _emailController.text.trim(),
+      activo: _activo,
+    );
+    final profesor = widget.profesor.copyWith(
+      usuario: usuario,
+      especialidad: _especialidadController.text.trim().isEmpty ? null : _especialidadController.text.trim(),
+      gradoAcademico: _gradoController.text.trim().isEmpty ? null : _gradoController.text.trim(),
+      fechaActualizacion: now,
+    );
+    final success = await ref.read(profesoresProvider.notifier).actualizarProfesor(profesor.id, profesor);
+    if (!mounted) return;
+    final nuevaClave = _contrasenaController.text.trim();
+    if (nuevaClave.isNotEmpty) {
+      try {
+        await ProfesorRepository().actualizarContrasena(
+          profesorId: int.tryParse(profesor.id) ?? 0,
+          nuevaContrasena: nuevaClave,
+          usuarioId: profesor.usuario.id,
+        );
+      } catch (_) {}
+    }
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'Profesor actualizado' : 'Error al actualizar profesor'),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
   }
 }

@@ -174,9 +174,9 @@ class PreguntaCard extends StatefulWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty<PreguntaTemporal>('pregunta', pregunta));
-    properties.add(IntProperty('numero', numero));
-    properties.add(ObjectFlagProperty<VoidCallback?>.has('onEliminar', onEliminar));
+    properties..add(DiagnosticsProperty<PreguntaTemporal>('pregunta', pregunta))
+    ..add(IntProperty('numero', numero))
+    ..add(ObjectFlagProperty<VoidCallback?>.has('onEliminar', onEliminar));
   }
 }
 
@@ -478,11 +478,11 @@ class ResumenItem extends StatelessWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty<IconData>('icono', icono));
-    properties.add(StringProperty('titulo', titulo));
-    properties.add(StringProperty('valor', valor));
-    properties.add(ColorProperty('color', color));
-    properties.add(StringProperty('subtitle', subtitle));
+    properties..add(DiagnosticsProperty<IconData>('icono', icono))
+    ..add(StringProperty('titulo', titulo))
+    ..add(StringProperty('valor', valor))
+    ..add(ColorProperty('color', color))
+    ..add(StringProperty('subtitle', subtitle));
   }
 }
 
