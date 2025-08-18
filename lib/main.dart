@@ -10,7 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+ 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
