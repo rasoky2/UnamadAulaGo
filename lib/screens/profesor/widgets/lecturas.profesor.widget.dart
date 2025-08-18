@@ -1,11 +1,18 @@
 import 'dart:io';
+
+import 'package:aulago/models/curso.model.dart';
 import 'package:aulago/models/lectura.model.dart';
+import 'package:aulago/models/usuario.model.dart';
+import 'package:aulago/providers/auth.riverpod.dart';
+import 'package:aulago/repositories/curso.repository.dart';
 import 'package:aulago/repositories/lectura.repository.dart';
+import 'package:aulago/repositories/profesor.repository.dart';
 import 'package:aulago/repositories/storage.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LecturasTab extends StatefulWidget {
@@ -24,13 +31,24 @@ class LecturasTab extends StatefulWidget {
 
 class _LecturasTabState extends State<LecturasTab> {
   final _repo = LecturaRepository();
+  final _cursoRepo = CursoRepository();
+  final _profesorRepo = ProfesorRepository();
   final _storage = StorageRepository();
   late Future<List<Lectura>> _future;
+  List<ModeloCurso> _cursosProfesor = const [];
+  String? _cursoSeleccionadoId;
+  bool _cargandoCursos = true;
 
   @override
   void initState() {
     super.initState();
-    _cargarLecturas();
+    // Inicializar para evitar LateInitializationError en el primer build
+    _future = Future.value(const <Lectura>[]);
+    // Preseleccionar con el curso recibido (si vino)
+    if (widget.cursoId.isNotEmpty) {
+      _cursoSeleccionadoId = widget.cursoId;
+    }
+    _cargarCursosDelProfesor();
   }
 
   @override
@@ -38,17 +56,22 @@ class _LecturasTabState extends State<LecturasTab> {
     super.didUpdateWidget(oldWidget);
     // Si cambió el cursoId, recargar las lecturas
     if (oldWidget.cursoId != widget.cursoId) {
+      _cursoSeleccionadoId = widget.cursoId;
       _cargarLecturas();
     }
   }
 
   void _cargarLecturas() {
-    debugPrint('[LecturasTab] Cargando lecturas para curso: ${widget.cursoId}');
+    final cursoIdUsado = _cursoSeleccionadoId ?? widget.cursoId;
+    debugPrint('[LecturasTab] Cargando lecturas para curso: $cursoIdUsado');
     
     // Validar que el cursoId sea válido
-    final cursoIdInt = int.tryParse(widget.cursoId);
+    final cursoIdInt = int.tryParse(cursoIdUsado);
     if (cursoIdInt == null) {
-      debugPrint('[LecturasTab] Error: cursoId inválido: ${widget.cursoId}');
+      debugPrint('[LecturasTab] Error: cursoId inválido: $cursoIdUsado');
+      setState(() {
+        _future = Future.value(const <Lectura>[]);
+      });
       return;
     }
     
@@ -57,11 +80,96 @@ class _LecturasTabState extends State<LecturasTab> {
     });
   }
 
+  Future<void> _cargarCursosDelProfesor() async {
+    setState(() => _cargandoCursos = true);
+    try {
+      final container = ProviderScope.containerOf(context, listen: false);
+      final ModeloUsuario? usuario = container.read(usuarioActualProvider);
+      if (usuario == null) {
+        setState(() {
+          _cursosProfesor = const [];
+          _cargandoCursos = false;
+        });
+        return;
+      }
+      final profesorId = await _profesorRepo.obtenerProfesorIdPorUsuarioId(usuario.id);
+      if (profesorId == null) {
+        setState(() {
+          _cursosProfesor = const [];
+          _cargandoCursos = false;
+        });
+        return;
+      }
+      // Fallback: traer todos y filtrar por profesor_id presente en JSON
+      final cursos = await _cursoRepo.obtenerCursos();
+      final filtrados = cursos.where((c) {
+        try {
+          final pid = c.toJson()['profesor_id'];
+          if (pid is int) {
+            return pid == profesorId;
+          }
+          if (pid is String) {
+            return int.tryParse(pid) == profesorId;
+          }
+          return false;
+        } catch (_) { return false; }
+      }).toList();
+      setState(() {
+        _cursosProfesor = filtrados;
+        // Seleccionar el curso inicial si no hay uno seleccionado
+        if (_cursoSeleccionadoId == null && _cursosProfesor.isNotEmpty) {
+          _cursoSeleccionadoId = _cursosProfesor.first.id.toString();
+        }
+        _cargandoCursos = false;
+      });
+      _cargarLecturas();
+    } catch (e) {
+      setState(() {
+        _cursosProfesor = const [];
+        _cargandoCursos = false;
+        _future = Future.value(const <Lectura>[]);
+      });
+    }
+  }
+
   Future<void> _refrescar() async {
     _cargarLecturas();
   }
 
+  String _cursoSeleccionadoNombre() {
+    final sel = _cursoSeleccionadoId;
+    if (sel == null) {
+      return 'Sin curso';
+    }
+    final curso = _cursosProfesor.firstWhere(
+      (c) => c.id.toString() == sel,
+      orElse: () => const ModeloCurso(
+        id: 0,
+        carreraId: 0,
+        codigoCurso: '—',
+        nombre: 'Sin curso',
+        creditos: 0,
+        horasTeoria: 0,
+        horasPractica: 0,
+        semestreRecomendado: null,
+        esObligatorio: false,
+        fechaCreacion: null,
+        profesorId: null,
+        descripcion: null,
+      ),
+    );
+    return '${curso.codigoCurso} - ${curso.nombre}';
+  }
+
   Future<void> _crearLecturaDialog() async {
+    if (_cursoSeleccionadoId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Seleccione un curso antes de crear una lectura'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     final formKey = GlobalKey<FormState>();
     final tituloCtrl = TextEditingController();
     final descripcionCtrl = TextEditingController();
@@ -98,7 +206,7 @@ class _LecturasTabState extends State<LecturasTab> {
                         Icon(Icons.school, color: Colors.blue.shade600, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'Curso ID: ${widget.cursoId}',
+                          'Curso seleccionado: ${_cursoSeleccionadoNombre()}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.blue.shade700,
@@ -321,7 +429,7 @@ class _LecturasTabState extends State<LecturasTab> {
                 
                 try {
                   String url;
-                  final cursoIdInt = int.parse(widget.cursoId);
+                  final cursoIdInt = int.parse(_cursoSeleccionadoId!);
                   
                   if (!esEnlace) {
                     // Subir archivo PDF
@@ -399,6 +507,38 @@ class _LecturasTabState extends State<LecturasTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // Selector de curso
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: _cargandoCursos
+                    ? const LinearProgressIndicator()
+                    : DropdownButtonFormField<String>(
+                        value: _cursoSeleccionadoId,
+                        decoration: const InputDecoration(
+                          labelText: 'Curso',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: _cursosProfesor
+                            .map((c) => DropdownMenuItem<String>(
+                                  value: c.id.toString(),
+                                  child: Text('${c.codigoCurso} - ${c.nombre}'),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          setState(() {
+                            _cursoSeleccionadoId = v;
+                          });
+                          _cargarLecturas();
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
         // Header con información del curso y botones
         Padding(
           padding: const EdgeInsets.all(16.0),
@@ -435,19 +575,20 @@ class _LecturasTabState extends State<LecturasTab> {
                 ],
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.school, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Curso ID: ${widget.cursoId}',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
+              if (_cursoSeleccionadoId != null)
+                Row(
+                  children: [
+                    Icon(Icons.school, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Text(
+                      _cursoSeleccionadoNombre(),
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),

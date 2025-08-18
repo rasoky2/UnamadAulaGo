@@ -13,7 +13,7 @@ import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:moony_nav_bar/moony_nav_bar.dart';
+// import 'package:moony_nav_bar/moony_nav_bar.dart';
 
 // Provider para manejar el índice de la página actual
 final indiceNavegacionAdminProvider = StateProvider<int>((ref) => 0);
@@ -270,105 +270,25 @@ class _AdminLayoutState extends ConsumerState<AdminLayout> {
   }
 
   Widget _buildBottomNavigation(int indiceActual) {
-    return MoonyNavigationBar(
-      items: <NavigationBarItem>[
-        NavigationBarItem(
-          icon: Icons.dashboard_rounded,
-          onTap: () {
-            debugPrint('📱 AdminLayout: Moony navigation tapped: 0');
-            _pageController.animateToPage(
-              0,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionAdminProvider.notifier).state = 0;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.people_outline,
-          activeIcon: Icons.people,
-          onTap: () {
-            debugPrint('📱 AdminLayout: Moony navigation tapped: 1');
-            _pageController.animateToPage(
-              1,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionAdminProvider.notifier).state = 1;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.school_outlined,
-          activeIcon: Icons.school,
-          onTap: () {
-            debugPrint('📱 AdminLayout: Moony navigation tapped: 2');
-            _pageController.animateToPage(
-              2,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionAdminProvider.notifier).state = 2;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.person_add_outlined,
-          activeIcon: Icons.person_add,
-          onTap: () {
-            debugPrint('📱 AdminLayout: Moony navigation tapped: 3');
-            _pageController.animateToPage(
-              3,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionAdminProvider.notifier).state = 3;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.book_outlined,
-          activeIcon: Icons.book,
-          onTap: () {
-            debugPrint('📱 AdminLayout: Moony navigation tapped: 4');
-            _pageController.animateToPage(
-              4,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionAdminProvider.notifier).state = 4;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.school_outlined,
-          activeIcon: Icons.school,
-          onTap: () {
-            debugPrint('📱 AdminLayout: Moony navigation tapped: 5');
-            _pageController.animateToPage(
-              5,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionAdminProvider.notifier).state = 5;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.event_note,
-          activeIcon: Icons.event,
-          onTap: () {
-            _pageController.animateToPage(
-              6,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionAdminProvider.notifier).state = 6;
-          },
-        ),
+    return NavigationBar(
+      selectedIndex: indiceActual,
+      onDestinationSelected: (index) {
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        ref.read(indiceNavegacionAdminProvider.notifier).state = index;
+      },
+      destinations: const [
+        NavigationDestination(icon: Icon(Icons.dashboard_rounded), label: 'Inicio'),
+        NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Estudiantes'),
+        NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Matrículas'),
+        NavigationDestination(icon: Icon(Icons.person_add_outlined), selectedIcon: Icon(Icons.person_add), label: 'Profesores'),
+        NavigationDestination(icon: Icon(Icons.book_outlined), selectedIcon: Icon(Icons.book), label: 'Cursos'),
+        NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Carreras'),
+        NavigationDestination(icon: Icon(Icons.event_note), selectedIcon: Icon(Icons.event), label: 'Extras'),
       ],
-      style: MoonyNavStyle(
-        activeColor: AppConstants.primaryColor,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(10),
-          topRight: Radius.circular(10),
-        ),
-      ),
     );
   }
 

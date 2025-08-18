@@ -13,7 +13,7 @@ import 'package:aulago/utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:moony_nav_bar/moony_nav_bar.dart';
+// import 'package:moony_nav_bar/moony_nav_bar.dart';
 
 // Provider para manejar el índice de navegación en los cursos del alumno
 final indiceNavegacionCursoAlumnoProvider = StateProvider<int>((ref) => 0);
@@ -380,88 +380,25 @@ class _PantallaCursosAlumnoState extends ConsumerState<PantallaCursosAlumno> {
 
   // Método para construir la navegación inferior en móvil
   Widget _construirBottomNavigation() {
-    return MoonyNavigationBar(
-      items: <NavigationBarItem>[
-        NavigationBarItem(
-          icon: Icons.book_outlined,
-          activeIcon: Icons.book,
-          onTap: () {
-            _pageController.animateToPage(
-              0,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionCursoAlumnoProvider.notifier).state = 0;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.assignment_outlined,
-          activeIcon: Icons.assignment,
-          onTap: () {
-            _pageController.animateToPage(
-              1,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionCursoAlumnoProvider.notifier).state = 1;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.quiz_outlined,
-          activeIcon: Icons.quiz,
-          onTap: () {
-            _pageController.animateToPage(
-              2,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionCursoAlumnoProvider.notifier).state = 2;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.forum_outlined,
-          activeIcon: Icons.forum,
-          onTap: () {
-            _pageController.animateToPage(
-              3,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionCursoAlumnoProvider.notifier).state = 3;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.calendar_today_outlined,
-          activeIcon: Icons.calendar_today,
-          onTap: () {
-            _pageController.animateToPage(
-              4,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionCursoAlumnoProvider.notifier).state = 4;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.info_outline,
-          activeIcon: Icons.info,
-          onTap: () {
-            _pageController.animateToPage(
-              5,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionCursoAlumnoProvider.notifier).state = 5;
-          },
-        ),
+    final indiceActual = ref.watch(indiceNavegacionCursoAlumnoProvider);
+    return NavigationBar(
+      selectedIndex: indiceActual,
+      onDestinationSelected: (index) {
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        ref.read(indiceNavegacionCursoAlumnoProvider.notifier).state = index;
+      },
+      destinations: const [
+        NavigationDestination(icon: Icon(Icons.book_outlined), selectedIcon: Icon(Icons.book), label: 'Unidades'),
+        NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment), label: 'Tareas'),
+        NavigationDestination(icon: Icon(Icons.quiz_outlined), selectedIcon: Icon(Icons.quiz), label: 'Exámenes'),
+        NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: 'Foros'),
+        NavigationDestination(icon: Icon(Icons.calendar_today_outlined), selectedIcon: Icon(Icons.calendar_today), label: 'Calendario'),
+        NavigationDestination(icon: Icon(Icons.info_outline), selectedIcon: Icon(Icons.info), label: 'Wiki'),
       ],
-      style: MoonyNavStyle(
-        activeColor: AppConstants.primaryColor,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(10),
-          topRight: Radius.circular(10),
-        ),
-      ),
     );
   }
 

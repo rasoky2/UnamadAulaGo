@@ -3,6 +3,8 @@ import 'package:aulago/routes/routes.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher_string.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -434,6 +436,42 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
               
               const SizedBox(height: 40),
               
+              // Botón descargar APK (Android)
+              SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    const String assetPath = 'assets/download/app-release.apk';
+                    if (kIsWeb) {
+                      final ok = await launchUrlString(assetPath, webOnlyWindowName: '_self');
+                      if (!ok && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('No se pudo iniciar la descarga.', style: GoogleFonts.notoSans()),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppConstants.errorColor,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('La descarga está disponible solo en Web.', style: GoogleFonts.notoSans()),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.download),
+                  label: Text(
+                    'Descargar APK',
+                    style: GoogleFonts.notoSans(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Información de acceso
               Container(
                 padding: const EdgeInsets.all(16),

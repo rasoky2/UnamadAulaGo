@@ -12,7 +12,7 @@ import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:moony_nav_bar/moony_nav_bar.dart';
+import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
 // Provider para manejar el índice de la página actual del profesor
 final indiceNavegacionProfesorProvider = StateProvider<int>((ref) => 0);
@@ -33,8 +33,8 @@ class ProfesorLayout extends ConsumerStatefulWidget {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(StringProperty('titulo', titulo));
-    properties.add(IntProperty('initialIndex', initialIndex));
+    properties..add(StringProperty('titulo', titulo))
+    ..add(IntProperty('initialIndex', initialIndex));
   }
 }
 
@@ -105,62 +105,29 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
   }
 
   Widget _buildLayoutMovil(int indiceActual) {
-    final usuario = ref.watch(proveedorAuthProvider).usuario!;
-    
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: AppConstants.backgroundLight,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: AppConstants.textPrimary,
-        elevation: 1,
-        title: Text(
-          _obtenerTituloPorIndice(indiceActual),
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              debugPrint('🔔 ProfesorLayout: Botón notificaciones presionado');
-            },
-            tooltip: 'Notificaciones',
-          ),
-          PopupMenuButton<String>(
-            icon: AvatarWidget(
-              fotoUrl: usuario.fotoPerfilUrl,
-              nombreCompleto: usuario.nombreCompleto,
-              tipoUsuario: 'profesor',
-              radio: 16,
-            ),
-            itemBuilder: (context) => [
-              const PopupMenuItem<String>(
-                value: 'logout',
-                child: ListTile(
-                  leading: Icon(Icons.logout, color: Colors.red),
-                  title: Text('Cerrar Sesión'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-            onSelected: (valor) => _manejarMenuUsuario(context, valor),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      drawer: _buildDrawerMovil(usuario),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (indice) {
-          debugPrint('📄 ProfesorLayout: Página cambiada a índice: $indice');
-          ref.read(indiceNavegacionProfesorProvider.notifier).state = indice;
-        },
-        children: _obtenerPaginas(),
-      ),
-      bottomNavigationBar: _buildBottomNavigation(indiceActual),
+    // Usamos PersistentTabView como contenedor principal en móvil (Style 6, máx 6 ítems)
+    final List<int> navToPageIndex = <int>[0, 1, 2, 3, 5, 6];
+    final int initialNavIndex = navToPageIndex.indexOf(indiceActual);
+    final int controllerIndex = initialNavIndex == -1 ? 0 : initialNavIndex;
+
+    return PersistentTabView(
+      context,
+      controller: PersistentTabController(initialIndex: controllerIndex),
+      screens: _obtenerPantallasMovil(),
+      items: [
+        PersistentBottomNavBarItem(icon: const Icon(Icons.home_rounded), title: 'Inicio', activeColorPrimary: AppConstants.primaryColor, inactiveColorPrimary: AppConstants.textSecondary),
+        PersistentBottomNavBarItem(icon: const Icon(Icons.book_outlined), title: 'Cursos', activeColorPrimary: AppConstants.primaryColor, inactiveColorPrimary: AppConstants.textSecondary),
+        PersistentBottomNavBarItem(icon: const Icon(Icons.grade_outlined), title: 'Calificaciones', activeColorPrimary: AppConstants.primaryColor, inactiveColorPrimary: AppConstants.textSecondary),
+        PersistentBottomNavBarItem(icon: const Icon(Icons.people_outline), title: 'Estudiantes', activeColorPrimary: AppConstants.primaryColor, inactiveColorPrimary: AppConstants.textSecondary),
+        PersistentBottomNavBarItem(icon: const Icon(Icons.assignment_outlined), title: 'Exámenes', activeColorPrimary: AppConstants.primaryColor, inactiveColorPrimary: AppConstants.textSecondary),
+        PersistentBottomNavBarItem(icon: const Icon(Icons.menu_book_outlined), title: 'Lecturas', activeColorPrimary: AppConstants.primaryColor, inactiveColorPrimary: AppConstants.textSecondary),
+      ],
+      padding: const EdgeInsets.only(top: 6),
+      navBarStyle: NavBarStyle.style6,
+      onItemSelected: (navIndex) {
+        final int pageIndex = navToPageIndex[navIndex];
+        ref.read(indiceNavegacionProfesorProvider.notifier).state = pageIndex;
+      },
     );
   }
 
@@ -296,83 +263,6 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
     );
   }
 
-  Widget _buildBottomNavigation(int indiceActual) {
-    return MoonyNavigationBar(
-      items: <NavigationBarItem>[
-        NavigationBarItem(
-          icon: Icons.home_rounded,
-          onTap: () {
-            debugPrint('📱 ProfesorLayout: Moony navigation tapped: 0');
-            _pageController.animateToPage(
-              0,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionProfesorProvider.notifier).state = 0;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.book_outlined,
-          activeIcon: Icons.book,
-          onTap: () {
-            debugPrint('📱 ProfesorLayout: Moony navigation tapped: 1');
-            _pageController.animateToPage(
-              1,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionProfesorProvider.notifier).state = 1;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.grade_outlined,
-          activeIcon: Icons.grade,
-          onTap: () {
-            debugPrint('📱 ProfesorLayout: Moony navigation tapped: 2');
-            _pageController.animateToPage(
-              2,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionProfesorProvider.notifier).state = 2;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.people_outline,
-          activeIcon: Icons.people,
-          onTap: () {
-            debugPrint('📱 ProfesorLayout: Moony navigation tapped: 3');
-            _pageController.animateToPage(
-              3,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionProfesorProvider.notifier).state = 3;
-          },
-        ),
-        NavigationBarItem(
-          icon: Icons.assignment_outlined,
-          activeIcon: Icons.assignment,
-          onTap: () {
-            debugPrint('📱 ProfesorLayout: Moony navigation tapped: 4');
-            _pageController.animateToPage(
-              4,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            ref.read(indiceNavegacionProfesorProvider.notifier).state = 4;
-          },
-        ),
-      ],
-      style: MoonyNavStyle(
-        activeColor: AppConstants.primaryColor,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(10),
-          topRight: Radius.circular(10),
-        ),
-      ),
-    );
-  }
 
   List<Widget> _obtenerPaginas() {
     return [
@@ -384,6 +274,93 @@ class _ProfesorLayoutState extends ConsumerState<ProfesorLayout> {
       _PaginaProfesorWrapper(child: _construirPaginaExamenes()),
       _PaginaProfesorWrapper(child: _construirPaginaLecturas()),
     ];
+  }
+
+  // Páginas visibles en el navbar móvil (Style 6 admite máximo 6 ítems)
+
+  // Pantallas completas para móvil, cada una con su propio Scaffold y AppBar
+  List<Widget> _obtenerPantallasMovil() {
+    final usuario = ref.watch(proveedorAuthProvider).usuario!;
+    return [
+      Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: AppConstants.backgroundLight,
+        appBar: _buildAppBarMovil('Inicio', usuario),
+        drawer: _buildDrawerMovil(usuario),
+        body: _construirPaginaInicio(),
+      ),
+      Scaffold(
+        backgroundColor: AppConstants.backgroundLight,
+        appBar: _buildAppBarMovil('Mis Cursos', usuario),
+        drawer: _buildDrawerMovil(usuario),
+        body: _construirPaginaCursos(),
+      ),
+      Scaffold(
+        backgroundColor: AppConstants.backgroundLight,
+        appBar: _buildAppBarMovil('Calificaciones', usuario),
+        drawer: _buildDrawerMovil(usuario),
+        body: _construirPaginaCalificaciones(),
+      ),
+      Scaffold(
+        backgroundColor: AppConstants.backgroundLight,
+        appBar: _buildAppBarMovil('Estudiantes', usuario),
+        drawer: _buildDrawerMovil(usuario),
+        body: _construirPaginaEstudiantes(),
+      ),
+      Scaffold(
+        backgroundColor: AppConstants.backgroundLight,
+        appBar: _buildAppBarMovil('Exámenes', usuario),
+        drawer: _buildDrawerMovil(usuario),
+        body: _construirPaginaExamenes(),
+      ),
+      Scaffold(
+        backgroundColor: AppConstants.backgroundLight,
+        appBar: _buildAppBarMovil('Lecturas', usuario),
+        drawer: _buildDrawerMovil(usuario),
+        body: _construirPaginaLecturas(),
+      ),
+    ];
+  }
+
+  PreferredSizeWidget _buildAppBarMovil(String titulo, usuario) {
+    return AppBar(
+      backgroundColor: Colors.white,
+      foregroundColor: AppConstants.textPrimary,
+      elevation: 1,
+      title: Text(
+        titulo,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: () {
+            debugPrint('🔔 ProfesorLayout: Botón notificaciones presionado');
+          },
+          tooltip: 'Notificaciones',
+        ),
+        PopupMenuButton<String>(
+          icon: AvatarWidget(
+            fotoUrl: usuario.fotoPerfilUrl,
+            nombreCompleto: usuario.nombreCompleto,
+            tipoUsuario: 'profesor',
+            radio: 16,
+          ),
+          itemBuilder: (context) => const [
+            PopupMenuItem<String>(
+              value: 'logout',
+              child: ListTile(
+                leading: Icon(Icons.logout, color: Colors.red),
+                title: Text('Cerrar Sesión'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+          onSelected: (valor) => _manejarMenuUsuario(context, valor),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
   }
 
   // Constructores de páginas

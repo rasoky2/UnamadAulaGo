@@ -4,8 +4,10 @@ import 'package:aulago/repositories/carrera.repository.dart';
 import 'package:aulago/repositories/estudiante.repository.dart';
 import 'package:aulago/utils/constants.dart';
 import 'package:aulago/widgets/avatar_widget.dart';
+import 'package:aulago/widgets/foto_perfil_upload.widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final estudiantesProvider = StateNotifierProvider<_EstudiantesNotifier, List<EstudianteAdmin>>((ref) {
@@ -21,9 +23,9 @@ class _EstudiantesNotifier extends StateNotifier<List<EstudianteAdmin>> {
     final lista = await _repo.obtenerEstudiantes();
     state = lista;
   }
-  Future<bool> crearEstudiante(EstudianteAdmin estudiante) async {
+  Future<bool> crearEstudiante(EstudianteAdmin estudiante, {required String contrasena}) async {
     try {
-      await _repo.crearEstudiante(estudiante);
+      await _repo.crearEstudiante(estudiante, contrasena: contrasena);
       await cargarEstudiantes();
       return true;
     } catch (_) {
@@ -94,7 +96,7 @@ class _PantallaEstudiantesAdminState extends ConsumerState<PantallaEstudiantesAd
           ),
           const SizedBox(width: 8),
           ElevatedButton.icon(
-            onPressed: () => _mostrarDialogoEstudiante(context),
+            onPressed: () => _mostrarSheetCrearEstudiante(context),
             icon: const Icon(Icons.add),
             label: const Text('Nuevo Estudiante'),
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
@@ -133,7 +135,6 @@ class _PantallaEstudiantesAdminState extends ConsumerState<PantallaEstudiantesAd
             leading: AvatarWidget(
               fotoUrl: estudiante.fotoPerfilUrl,
               nombreCompleto: estudiante.nombreCompleto,
-              tipoUsuario: 'estudiante',
               radio: 18,
               mostrarBordeOnline: estudiante.activo,
             ),
@@ -144,7 +145,7 @@ class _PantallaEstudiantesAdminState extends ConsumerState<PantallaEstudiantesAd
               children: [
                 IconButton(
                   icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () => _mostrarDialogoEstudiante(context, estudiante),
+                  onPressed: () => _mostrarSheetEditarEstudiante(context, estudiante),
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
@@ -157,10 +158,27 @@ class _PantallaEstudiantesAdminState extends ConsumerState<PantallaEstudiantesAd
       },
     );
   }
-  void _mostrarDialogoEstudiante(BuildContext context, [EstudianteAdmin? estudiante]) {
-    showDialog(
+  // Eliminado el diálogo clásico; ahora usamos bottom sheets para crear/editar
+
+  void _mostrarSheetCrearEstudiante(BuildContext context) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => _DialogoEstudiante(estudiante: estudiante),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => const _SheetCrearEstudiante(),
+    );
+  }
+
+  void _mostrarSheetEditarEstudiante(BuildContext context, EstudianteAdmin estudiante) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _SheetEditarEstudiante(estudiante: estudiante),
     );
   }
   void _confirmarEliminar(BuildContext context, EstudianteAdmin estudiante) {
@@ -197,59 +215,55 @@ class _PantallaEstudiantesAdminState extends ConsumerState<PantallaEstudiantesAd
   }
 }
 
-class _DialogoEstudiante extends ConsumerStatefulWidget {
-  const _DialogoEstudiante({this.estudiante});
-  final EstudianteAdmin? estudiante;
-  @override
-  ConsumerState<_DialogoEstudiante> createState() => _DialogoEstudianteState();
+// Diálogo clásico removido: ahora solo bottom sheets para crear/editar estudiantes
 
+class _SheetCrearEstudiante extends ConsumerStatefulWidget {
+  const _SheetCrearEstudiante();
   @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty<EstudianteAdmin?>('estudiante', estudiante));
-  }
+  ConsumerState<_SheetCrearEstudiante> createState() => _SheetCrearEstudianteState();
 }
-class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
+
+class _SheetCrearEstudianteState extends ConsumerState<_SheetCrearEstudiante> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nombreController;
   late final TextEditingController _codigoController;
-  late final TextEditingController _emailController;
+  late final TextEditingController _usuarioEmailController;
+  late final TextEditingController _emailFullController;
   late final TextEditingController _telefonoController;
   late final TextEditingController _semestreController;
   late final TextEditingController _direccionController;
+  late final TextEditingController _contrasenaController;
   DateTime? _fechaNacimiento;
   bool _activo = true;
   int? _carreraSeleccionadaId;
   List<ModeloCarrera> _carreras = const [];
   final _carreraRepo = CarreraRepository();
-  final _estRepo = EstudianteRepository();
-  final TextEditingController _nuevaContrasenaController = TextEditingController();
-  final TextEditingController _contrasenaAlCrearController = TextEditingController();
-  bool _mostrarContrasena = false;
+  bool _bloquearDominioEmail = true;
+
   @override
   void initState() {
     super.initState();
-    _nombreController = TextEditingController(text: widget.estudiante?.nombreCompleto ?? '');
-    _codigoController = TextEditingController(text: widget.estudiante?.codigoEstudiante ?? '');
-    _emailController = TextEditingController(text: widget.estudiante?.correoElectronico ?? '');
-    _telefonoController = TextEditingController(text: widget.estudiante?.telefono ?? '');
-    _semestreController = TextEditingController(text: widget.estudiante?.semestreActual?.toString() ?? '');
-    _direccionController = TextEditingController(text: widget.estudiante?.direccion ?? '');
-    _fechaNacimiento = widget.estudiante?.fechaNacimiento;
-    _activo = widget.estudiante?.activo ?? true;
-    _carreraSeleccionadaId = widget.estudiante?.carreraId;
+    _nombreController = TextEditingController();
+    _codigoController = TextEditingController();
+    _usuarioEmailController = TextEditingController();
+    _emailFullController = TextEditingController();
+    _telefonoController = TextEditingController();
+    _semestreController = TextEditingController();
+    _direccionController = TextEditingController();
+    _contrasenaController = TextEditingController();
     _cargarCarreras();
   }
+
   @override
   void dispose() {
     _nombreController.dispose();
     _codigoController.dispose();
-    _emailController.dispose();
+    _usuarioEmailController.dispose();
+    _emailFullController.dispose();
     _telefonoController.dispose();
     _semestreController.dispose();
     _direccionController.dispose();
-    _nuevaContrasenaController.dispose();
-    _contrasenaAlCrearController.dispose();
+    _contrasenaController.dispose();
     super.dispose();
   }
 
@@ -259,76 +273,147 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
       setState(() => _carreras = lista);
     }
   }
+
   @override
   Widget build(BuildContext context) {
-    final esEdicion = widget.estudiante != null;
-    return AlertDialog(
-      title: Text(esEdicion ? 'Editar Estudiante' : 'Nuevo Estudiante'),
-      content: SizedBox(
-        width: 400,
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: AppConstants.defaultPadding,
+          right: AppConstants.defaultPadding,
+          top: AppConstants.defaultPadding,
+          bottom: viewInsets + AppConstants.defaultPadding,
+        ),
+        child: SingleChildScrollView(
         child: Form(
           key: _formKey,
           child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (esEdicion) ...[
-                Align(
-                  alignment: Alignment.center,
-                  child: AvatarWidget(
-                    fotoUrl: widget.estudiante?.fotoPerfilUrl,
-                    nombreCompleto: widget.estudiante?.nombreCompleto ?? 'Estudiante',
-                    tipoUsuario: 'estudiante',
-                    radio: 36,
-                    mostrarBordeOnline: _activo,
-                  ),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Nuevo Estudiante',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Cerrar',
+                    )
+                  ],
                 ),
-                const SizedBox(height: 16),
-              ],
+                const SizedBox(height: 12),
+
               TextFormField(
                 controller: _nombreController,
                 decoration: const InputDecoration(labelText: 'Nombre Completo *', border: OutlineInputBorder()),
                 validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
               ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
               TextFormField(
                 controller: _codigoController,
                 decoration: const InputDecoration(labelText: 'Código de Estudiante *', border: OutlineInputBorder()),
-                validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
-              ),
-              const SizedBox(height: 16),
-              // Contraseña en creación
-              if (!esEdicion) ...[
-                TextFormField(
-                  controller: _contrasenaAlCrearController,
-                  decoration: const InputDecoration(labelText: 'Contraseña *', border: OutlineInputBorder()),
-                  obscureText: true,
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Campo requerido' : null,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Campo requerido';
+                    }
+                    if (value.trim().length > 10) {
+                      return 'Máximo 10 dígitos';
+                    }
+                    return null;
+                  },
                 ),
-                const SizedBox(height: 16),
-              ],
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email *', border: OutlineInputBorder()),
+                const SizedBox(height: 12),
+
+                // Email institucional bloqueando dominio
+                Row(
+                  children: [
+                    Expanded(
+                      child: _bloquearDominioEmail
+                          ? TextFormField(
+                              controller: _usuarioEmailController,
+                              decoration: const InputDecoration(
+                                labelText: 'Usuario del correo *',
+                                hintText: 'usuario',
+                                border: OutlineInputBorder(),
+                                suffixText: '@unamad.edu.pe',
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Campo requerido';
+                                }
+                                if (value.contains('@')) {
+                                  return 'Solo ingrese el usuario, sin @';
+                                }
+                                return null;
+                              },
+                            )
+                          : TextFormField(
+                              controller: _emailFullController,
+                              decoration: const InputDecoration(
+                                labelText: 'Email *',
+                                hintText: 'usuario@unamad.edu.pe',
+                                border: OutlineInputBorder(),
+                              ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
+                                if (value == null || value.trim().isEmpty) {
                     return 'Campo requerido';
                   }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}').hasMatch(value)) {
-                    return 'Email inválido';
+                                final email = value.trim();
+                                if (!email.endsWith('@unamad.edu.pe')) {
+                                  return 'Debe ser dominio @unamad.edu.pe';
+                                }
+                                final local = email.split('@').first;
+                                if (local.isEmpty) {
+                                  return 'Ingrese el usuario antes de @unamad.edu.pe';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => setState(() => _bloquearDominioEmail = !_bloquearDominioEmail),
+                      icon: Icon(_bloquearDominioEmail ? Icons.lock : Icons.lock_open),
+                      tooltip: _bloquearDominioEmail ? 'Desbloquear dominio' : 'Bloquear dominio',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
               TextFormField(
                 controller: _telefonoController,
-                decoration: const InputDecoration(labelText: 'Teléfono', border: OutlineInputBorder()),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
+                  decoration: const InputDecoration(labelText: 'Teléfono (9 dígitos)', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
+                  validator: (value) {
+                    if (value != null && value.trim().isNotEmpty) {
+                      if (value.trim().length != 9) {
+                        return 'Debe tener exactamente 9 dígitos';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
               DropdownButtonFormField<int>(
-                value: _carreraSeleccionadaId,
+                  initialValue: _carreraSeleccionadaId,
                 decoration: const InputDecoration(labelText: 'Carrera *', border: OutlineInputBorder()),
                 items: _carreras
                     .map((c) => DropdownMenuItem<int>(
@@ -339,7 +424,8 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
                 onChanged: (v) => setState(() => _carreraSeleccionadaId = v),
                 validator: (v) => v == null ? 'Seleccione una carrera' : null,
               ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
               TextFormField(
                 controller: _semestreController,
                 decoration: const InputDecoration(labelText: 'Semestre Actual *', border: OutlineInputBorder()),
@@ -355,12 +441,14 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
               TextFormField(
                 controller: _direccionController,
                 decoration: const InputDecoration(labelText: 'Dirección', border: OutlineInputBorder()),
               ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
               Row(
                 children: [
                   Expanded(
@@ -399,48 +487,357 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              // Campo de contraseña para edición
-              if (esEdicion) ...[
+                const SizedBox(height: 12),
+
                 TextFormField(
-                  controller: _nuevaContrasenaController,
+                  controller: _contrasenaController,
+                  decoration: const InputDecoration(labelText: 'Contraseña *', border: OutlineInputBorder()),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Campo requerido';
+                    }
+                    if (value.trim().length < 6) {
+                      return 'Mínimo 6 caracteres';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _guardarEstudiante,
+                        child: const Text('Crear'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _guardarEstudiante() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // Construir email según estado del bloqueo
+    final String email = _bloquearDominioEmail
+        ? '${_usuarioEmailController.text.trim()}@unamad.edu.pe'
+        : _emailFullController.text.trim();
+
+    final estudiante = EstudianteAdmin(
+      id: 0,
+      codigoEstudiante: _codigoController.text.trim(),
+      nombreCompleto: _nombreController.text.trim(),
+      correoElectronico: email,
+      telefono: _telefonoController.text.trim().isEmpty ? null : _telefonoController.text.trim(),
+      carreraId: _carreraSeleccionadaId,
+      semestreActual: int.tryParse(_semestreController.text.trim()),
+      fechaIngreso: DateTime.now(),
+      fechaCreacion: DateTime.now(),
+      fechaActualizacion: DateTime.now(),
+      direccion: _direccionController.text.trim().isEmpty ? null : _direccionController.text.trim(),
+      fechaNacimiento: _fechaNacimiento,
+      estado: _activo ? 'activo' : 'inactivo',
+    );
+
+    final success = await ref.read(estudiantesProvider.notifier).crearEstudiante(
+          estudiante,
+          contrasena: _contrasenaController.text.trim(),
+        );
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'Estudiante creado exitosamente' : 'Error al crear estudiante'),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+  }
+}
+
+class _SheetEditarEstudiante extends ConsumerStatefulWidget {
+  const _SheetEditarEstudiante({required this.estudiante});
+  final EstudianteAdmin estudiante;
+  @override
+  ConsumerState<_SheetEditarEstudiante> createState() => _SheetEditarEstudianteState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<EstudianteAdmin>('estudiante', estudiante));
+  }
+}
+
+class _SheetEditarEstudianteState extends ConsumerState<_SheetEditarEstudiante> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nombreController;
+  late final TextEditingController _codigoController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _telefonoController;
+  late final TextEditingController _semestreController;
+  late final TextEditingController _direccionController;
+  late final TextEditingController _nuevaContrasenaController;
+  DateTime? _fechaNacimiento;
+  bool _activo = true;
+  int? _carreraSeleccionadaId;
+  List<ModeloCarrera> _carreras = const [];
+  final _carreraRepo = CarreraRepository();
+  bool _mostrarContrasena = false;
+  String? _fotoTemporalUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.estudiante;
+    _nombreController = TextEditingController(text: e.nombreCompleto);
+    _codigoController = TextEditingController(text: e.codigoEstudiante);
+    _emailController = TextEditingController(text: e.correoElectronico ?? '');
+    _telefonoController = TextEditingController(text: e.telefono ?? '');
+    _semestreController = TextEditingController(text: e.semestreActual?.toString() ?? '');
+    _direccionController = TextEditingController(text: e.direccion ?? '');
+    _nuevaContrasenaController = TextEditingController();
+    _fechaNacimiento = e.fechaNacimiento;
+    _activo = e.activo;
+    _carreraSeleccionadaId = e.carreraId;
+    _fotoTemporalUrl = e.fotoPerfilUrl;
+    _cargarCarreras();
+  }
+
+  @override
+  void dispose() {
+    _nombreController.dispose();
+    _codigoController.dispose();
+    _emailController.dispose();
+    _telefonoController.dispose();
+    _semestreController.dispose();
+    _direccionController.dispose();
+    _nuevaContrasenaController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _cargarCarreras() async {
+    final lista = await _carreraRepo.obtenerCarreras();
+    if (mounted) {
+      setState(() => _carreras = lista);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: AppConstants.defaultPadding,
+          right: AppConstants.defaultPadding,
+          top: AppConstants.defaultPadding,
+          bottom: viewInsets + AppConstants.defaultPadding,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Editar Estudiante', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Cerrar',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Foto con uploader
+                Center(
+                  child: FotoPerfilUploadWidget(
+                    usuarioId: (widget.estudiante.usuarioId ?? widget.estudiante.id).toString(),
+                    nombreCompleto: widget.estudiante.nombreCompleto,
+                    tipoUsuario: 'estudiante',
+                    fotoActualUrl: _fotoTemporalUrl,
+                    radio: 36,
+                    onFotoSubida: (nuevaUrl) {
+                      setState(() => _fotoTemporalUrl = nuevaUrl);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _nombreController,
+                  decoration: const InputDecoration(labelText: 'Nombre Completo *', border: OutlineInputBorder()),
+                  validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _codigoController,
+                  decoration: const InputDecoration(labelText: 'Código de Estudiante *', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Campo requerido';
+                    }
+                    if (value.trim().length > 10) {
+                      return 'Máximo 10 dígitos';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: 'Email *', hintText: 'usuario@unamad.edu.pe', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Campo requerido';
+                    }
+                    final email = value.trim();
+                    if (!email.endsWith('@unamad.edu.pe')) {
+                      return 'Debe ser dominio @unamad.edu.pe';
+                    }
+                    final local = email.split('@').first;
+                    if (local.isEmpty) {
+                      return 'Ingrese el usuario antes de @unamad.edu.pe';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _telefonoController,
+                  decoration: const InputDecoration(labelText: 'Teléfono (9 dígitos)', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
+                  validator: (value) {
+                    if (value != null && value.trim().isNotEmpty) {
+                      if (value.trim().length != 9) {
+                        return 'Debe tener exactamente 9 dígitos';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                DropdownButtonFormField<int>(
+                  initialValue: _carreraSeleccionadaId,
+                  decoration: const InputDecoration(labelText: 'Carrera *', border: OutlineInputBorder()),
+                  items: _carreras
+                      .map((c) => DropdownMenuItem<int>(value: c.id, child: Text(c.nombre)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _carreraSeleccionadaId = v),
+                  validator: (v) => v == null ? 'Seleccione una carrera' : null,
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _semestreController,
+                  decoration: const InputDecoration(labelText: 'Semestre Actual *', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Campo requerido';
+                    }
+                    final semestre = int.tryParse(value);
+                    if (semestre == null || semestre < 1 || semestre > 20) {
+                      return 'Debe ser entre 1 y 20';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _direccionController,
+                  decoration: const InputDecoration(labelText: 'Dirección', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final now = DateTime.now();
+                          final picked = await showDatePicker(
+      context: context,
+                            initialDate: _fechaNacimiento ?? DateTime(now.year - 18, now.month, now.day),
+                            firstDate: DateTime(1950),
+                            lastDate: DateTime(now.year - 10),
+                          );
+                          if (picked != null) {
+                            setState(() => _fechaNacimiento = picked);
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(labelText: 'Fecha de nacimiento', border: OutlineInputBorder()),
+                          child: Text(_fechaNacimiento == null ? 'Seleccionar' : _fechaNacimiento!.toIso8601String().substring(0, 10)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SwitchListTile(
+                        value: _activo,
+                        title: const Text('Activo'),
+                        onChanged: (v) => setState(() => _activo = v),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+            controller: _nuevaContrasenaController,
                   decoration: InputDecoration(
                     labelText: 'Nueva contraseña (opcional)',
                     border: const OutlineInputBorder(),
-                    helperText: _nuevaContrasenaController.text.isEmpty 
+                    helperText: _nuevaContrasenaController.text.isEmpty
                         ? 'Dejar vacío para mantener la contraseña actual'
-                        : _nuevaContrasenaController.text.length >= 6 
-                            ? 'Contraseña válida' 
-                            : 'Mínimo 6 caracteres',
+                        : _nuevaContrasenaController.text.length >= 6 ? 'Contraseña válida' : 'Mínimo 6 caracteres',
                     prefixIcon: const Icon(Icons.lock),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_nuevaContrasenaController.text.isNotEmpty)
-                          Icon(
-                            _nuevaContrasenaController.text.length >= 6 
-                                ? Icons.check_circle 
-                                : Icons.error,
-                            color: _nuevaContrasenaController.text.length >= 6 
-                                ? Colors.green 
-                                : Colors.orange,
-                          ),
-                        IconButton(
-                          icon: Icon(_mostrarContrasena ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () {
-                            setState(() {
-                              _mostrarContrasena = !_mostrarContrasena;
-                            });
-                          },
-                          tooltip: _mostrarContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña',
-                        ),
-                      ],
+                    suffixIcon: IconButton(
+                      icon: Icon(_mostrarContrasena ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => _mostrarContrasena = !_mostrarContrasena),
                     ),
                   ),
                   obscureText: !_mostrarContrasena,
-                  onChanged: (value) {
-                    setState(() {}); // Reconstruir para mostrar el indicador visual
-                  },
                   validator: (value) {
                     if (value != null && value.isNotEmpty && value.trim().length < 6) {
                       return 'La contraseña debe tener al menos 6 caracteres';
@@ -449,88 +846,74 @@ class _DialogoEstudianteState extends ConsumerState<_DialogoEstudiante> {
                   },
                 ),
                 const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _guardar,
+                        child: const Text('Guardar cambios'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: _guardarEstudiante,
-          child: Text(esEdicion ? 'Actualizar' : 'Crear'),
-        ),
-      ],
     );
   }
-  Future<void> _guardarEstudiante() async {
+
+  Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) {
-      return;
-    }
+                return;
+              }
     final estudiante = EstudianteAdmin(
-      id: widget.estudiante?.id ?? 0,
+      id: widget.estudiante.id,
       codigoEstudiante: _codigoController.text.trim(),
       nombreCompleto: _nombreController.text.trim(),
       correoElectronico: _emailController.text.trim(),
       telefono: _telefonoController.text.trim().isEmpty ? null : _telefonoController.text.trim(),
       carreraId: _carreraSeleccionadaId,
       semestreActual: int.tryParse(_semestreController.text.trim()),
-      fechaIngreso: widget.estudiante?.fechaIngreso ?? DateTime.now(),
-      fechaCreacion: widget.estudiante?.fechaCreacion ?? DateTime.now(),
+      fechaIngreso: widget.estudiante.fechaIngreso ?? DateTime.now(),
+      fechaCreacion: widget.estudiante.fechaCreacion ?? DateTime.now(),
       fechaActualizacion: DateTime.now(),
       direccion: _direccionController.text.trim().isEmpty ? null : _direccionController.text.trim(),
       fechaNacimiento: _fechaNacimiento,
       estado: _activo ? 'activo' : 'inactivo',
-      usuarioId: widget.estudiante?.usuarioId,
-      fotoPerfilUrl: widget.estudiante?.fotoPerfilUrl,
+      usuarioId: widget.estudiante.usuarioId,
+      fotoPerfilUrl: _fotoTemporalUrl,
     );
-    final notifier = ref.read(estudiantesProvider.notifier);
-    final creando = widget.estudiante == null;
-    final success = creando
-        ? await notifier.crearEstudiante(estudiante)
-        : await notifier.actualizarEstudiante(estudiante.id, estudiante);
+
+    final success = await ref.read(estudiantesProvider.notifier).actualizarEstudiante(estudiante.id, estudiante);
     if (!mounted) {
-      return;
-    }
-    // Si es creación, setear contraseña inmediatamente por código
-    if (creando) {
-      final clave = _contrasenaAlCrearController.text.trim();
-      if (clave.isNotEmpty) {
-        try {
-          await _estRepo.actualizarContrasenaPorCodigo(
-            codigoEstudiante: _codigoController.text.trim(),
-            nuevaContrasena: clave,
-          );
-        } catch (_) {}
-      }
-    }
-    
-    // Si es edición y se proporcionó una nueva contraseña, actualizarla
-    if (!creando && _nuevaContrasenaController.text.trim().isNotEmpty) {
+                return;
+              }
+    // Si se ingresó nueva contraseña, actualizarla
+    if (_nuevaContrasenaController.text.trim().isNotEmpty) {
       try {
-        await _estRepo.actualizarContrasena(
+        await EstudianteRepository().actualizarContrasena(
           estudianteId: estudiante.id,
           nuevaContrasena: _nuevaContrasenaController.text.trim(),
-          usuarioId: widget.estudiante?.usuarioId,
+          usuarioId: estudiante.usuarioId,
         );
       } catch (_) {}
     }
-    if (success) {
-      // Limpiar el campo de contraseña después de guardar exitosamente
-      _nuevaContrasenaController.clear();
-    }
-    
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(success ? 'Estudiante guardado exitosamente' : 'Error al guardar estudiante'),
+        content: Text(success ? 'Estudiante actualizado' : 'Error al actualizar estudiante'),
         backgroundColor: success ? Colors.green : Colors.red,
       ),
     );
   }
-
-
 }

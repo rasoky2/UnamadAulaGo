@@ -11,7 +11,7 @@ import 'package:aulago/widgets/avatar_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:moony_nav_bar/moony_nav_bar.dart';
+// import 'package:moony_nav_bar/moony_nav_bar.dart';
 
 final seccionAlumnoProvider = StateProvider<int>((ref) => 0);
 
@@ -97,39 +97,16 @@ class UnamadLayout extends ConsumerWidget {
           Expanded(child: contenido),
         ],
       ),
-      bottomNavigationBar: esMovil ? MoonyNavigationBar(
-        items: <NavigationBarItem>[
-          NavigationBarItem(
-            icon: Icons.house_rounded,
-            onTap: () {
-              debugPrint('📱 AlumnoLayout: Moony navigation tapped: 0');
-              ref.read(seccionAlumnoProvider.notifier).state = 0;
-            },
-          ),
-          NavigationBarItem(
-            icon: Icons.book_outlined,
-            activeIcon: Icons.book,
-            onTap: () {
-              debugPrint('📱 AlumnoLayout: Moony navigation tapped: 1');
-              ref.read(seccionAlumnoProvider.notifier).state = 1;
-            },
-          ),
-          NavigationBarItem(
-            icon: Icons.person_outline,
-            activeIcon: Icons.person,
-            onTap: () {
-              debugPrint('📱 AlumnoLayout: Moony navigation tapped: 2');
-              ref.read(seccionAlumnoProvider.notifier).state = 2;
-            },
-          ),
+      bottomNavigationBar: esMovil ? NavigationBar(
+        selectedIndex: seccion,
+        onDestinationSelected: (index) {
+          ref.read(seccionAlumnoProvider.notifier).state = index;
+        },
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.house_rounded), label: 'Inicio'),
+          NavigationDestination(icon: Icon(Icons.book_outlined), selectedIcon: Icon(Icons.book), label: 'Cursos'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
         ],
-        style: MoonyNavStyle(
-          activeColor: AppConstants.primaryColor,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(10),
-            topRight: Radius.circular(10),
-          ),
-        ),
       ) : null,
     );
   }
