@@ -698,7 +698,7 @@ class _SelectorCursosWidgetState extends ConsumerState<_SelectorCursosWidget> {
     );
   }
 
-  Widget _construirTarjetaCursoMovil(dynamic cursoDetallado) {
+  Widget _construirTarjetaCursoMovil(cursoDetallado) {
     final curso = cursoDetallado.curso;
     return Card(
       elevation: 2,
@@ -780,7 +780,7 @@ class _SelectorCursosWidgetState extends ConsumerState<_SelectorCursosWidget> {
     );
   }
 
-  Widget _construirTarjetaCursoDesktop(dynamic cursoDetallado) {
+  Widget _construirTarjetaCursoDesktop(cursoDetallado) {
     final curso = cursoDetallado.curso;
     return Card(
       elevation: 4,

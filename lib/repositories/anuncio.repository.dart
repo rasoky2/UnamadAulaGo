@@ -35,7 +35,9 @@ class AnuncioRepository extends BaseRepository<ModeloAnuncio> {
           .select()
           .order('fecha_creacion', ascending: false);
       
-      final anuncios = (response as List).map((json) => fromJson(json)).toList();
+      final List<ModeloAnuncio> anuncios = (response as List<dynamic>)
+          .map((item) => fromJson(item as Map<String, dynamic>))
+          .toList();
       debugPrint('[AnuncioRepository] ✅ Anuncios obtenidos: ${anuncios.length}');
       return anuncios;
     } catch (e) {
